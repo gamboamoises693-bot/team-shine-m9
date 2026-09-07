@@ -258,8 +258,8 @@ def export_excel():
         from openpyxl.chart import BarChart, PieChart, Reference
         from openpyxl.worksheet.table import Table, TableStyleInfo
         from openpyxl.utils import get_column_letter
-    except:
-        return "Add openpyxl to requirements.txt: openpyxl", 500
+    except Exception as e:
+        return f"<div style='padding:40px;font-family:system-ui'><h2>Excel Module Missing</h2><p>Add this to requirements.txt on GitHub then redeploy:</p><pre style='background:#111827;color:#fbbf24;padding:12px;border-radius:10px'>openpyxl==3.1.2</pre><p>Error: {str(e)}</p><a href='/ot_report' style='background:#fbbf24;padding:10px 20px;border-radius:10px;text-decoration:none;color:#000;font-weight:700'>Back to Reports</a></div>", 500
     
     wb = openpyxl.Workbook()
     ws = wb.active
