@@ -1,9 +1,10 @@
 
-import sqlite3, os
+import sqlite3
 from flask import Flask, request, redirect, g
+from datetime import datetime
 
 app = Flask(__name__)
-DATABASE = "Agent.db"  # DITO mismo sa repo, hindi /tmp, kaya auto persistent hanggat di ka nagre-redeploy
+DATABASE = "Agent.db"
 COLUMNS = ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']
 
 def get_db():
@@ -16,18 +17,18 @@ def get_db():
 def init_db():
     db = get_db()
     cols_def = ", ".join([f'"{c}" TEXT' for c in COLUMNS])
-    # Create table if not exists - pero hindi buburahin laman
     db.execute(f'CREATE TABLE IF NOT EXISTS agents (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols_def})')
+    db.execute("""CREATE TABLE IF NOT EXISTS ot_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id INTEGER,
+        ot_date TEXT,
+        ot_type TEXT,
+        hours REAL,
+        remarks TEXT,
+        created_at TEXT,
+        FOREIGN KEY(agent_id) REFERENCES agents(id)
+    )""")
     db.commit()
-    # Check if old schema from previous version exists and migrate
-    try:
-        cur = db.execute('PRAGMA table_info(agents)')
-        existing = [r[1] for r in cur.fetchall()]
-        for c in COLUMNS:
-            if c not in existing:
-                db.execute(f'ALTER TABLE agents ADD COLUMN "{c}" TEXT')
-        db.commit()
-    except: pass
 
 @app.teardown_appcontext
 def close_connection(ex):
@@ -35,31 +36,28 @@ def close_connection(ex):
     if db is not None:
         db.close()
 
-BASE = """
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+BASE_HTML = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<title>TEAM SHINE M9 - Executive</title>
+<title>TEAM SHINE M9 - OT</title>
 <style>
-body{background:#0f172a;color:#e2e8f0} .navbar{background:linear-gradient(90deg,#0f172a,#1e293b)!important;border-bottom:1px solid #334155}}
+body{background:#0f172a;color:#e2e8f0} .navbar{background:linear-gradient(90deg,#0f172a,#1e293b)!important;border-bottom:1px solid #334155}
 .card{background:#1e293b;border:1px solid #334155;border-radius:16px} .table{color:#e2e8f0}
-.table thead th{background:#0f172a;color:#94a3b8;border-bottom:2px solid #334155;font-size:11px;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;position:sticky;top:0;z-index:10}
+.table thead th{background:#0f172a;color:#94a3b8;border-bottom:2px solid #334155;font-size:11px;text-transform:uppercase;white-space:nowrap}
 .table tbody td{border-color:#1e293b;vertical-align:middle;font-size:13px;white-space:nowrap}
-.table-hover tbody tr:hover{background:#1e293b!important;transform:scale(1.01);transition:.2s} .badge-id{background:#0f172a;border:1px solid #334155;color:#94a3b8}
+.table-hover tbody tr:hover{background:#1e293b!important} .badge-id{background:#0f172a;border:1px solid #334155;color:#94a3b8}
 .btn-exec{background:#fbbf24;color:#0f172a;font-weight:700;border:none} .search-box{background:#0f172a;border:1px solid #334155;color:white}
-.detail-card{background:#0f172a;border:1px solid #334155;transition:.2s} .detail-card:hover{border-color:#fbbf24} .field-label{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.8px} .field-value{color:#f1f5f9;font-weight:500;font-size:14px}
-.scroll-hint{color:#475569;font-size:11px;text-align:center;padding:8px}
+.detail-card{background:#0f172a;border:1px solid #334155} .field-label{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.8px} .field-value{color:#f1f5f9;font-weight:500}
 </style></head><body>
 <nav class="navbar navbar-dark p-3 sticky-top"><div class="container-fluid d-flex justify-content-between">
-<div class="d-flex align-items-center gap-3"><i class="bi bi-stars fs-4 text-warning"></i><div><div class="fw-bold fs-5">TEAM SHINE M9</div><div style="font-size:11px;color:#94a3b8;letter-spacing:2px">EXECUTIVE • DYNAMIC DB</div></div><span class="badge bg-warning text-dark ms-3">{{count}} AGENTS</span><span class="badge bg-success ms-1">AUTO SAVE</span></div>
-<div class="d-flex gap-2"><a href="/" class="btn btn-sm btn-outline-light"><i class="bi bi-grid"></i> Dashboard</a><a href="/add" class="btn btn-sm btn-exec"><i class="bi bi-plus-lg"></i> Add Agent</a></div>
-</div></nav><div class="container-fluid p-4">{{CONTENT}}</div>
+<div class="d-flex align-items-center gap-3"><i class="bi bi-stars fs-4 text-warning"></i><div><div class="fw-bold fs-5">TEAM SHINE M9</div><div style="font-size:11px;color:#94a3b8;letter-spacing:2px">OT TRACKER EXECUTIVE</div></div><span class="badge bg-warning text-dark ms-3">__COUNT__ AGENTS</span></div>
+<div class="d-flex gap-2"><a href="/" class="btn btn-sm btn-outline-light">Dashboard</a><a href="/ot_report" class="btn btn-sm btn-outline-warning"><i class="bi bi-graph-up"></i> OT Report</a><a href="/add" class="btn btn-sm btn-exec">+ Add Agent</a></div>
+</div></nav><div class="container-fluid p-4">__CONTENT__</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body></html>
-"""
+</body></html>"""
 
 def render_page(content, count=0):
-    return BASE.replace("{{CONTENT}}", content).replace("{{count}}", str(count))
+    return BASE_HTML.replace("__CONTENT__", content).replace("__COUNT__", str(count))
 
 @app.route("/")
 def index():
@@ -73,15 +71,15 @@ def index():
     else:
         cur = db.execute('SELECT * FROM agents ORDER BY id DESC')
     agents = cur.fetchall()
+    ot_summary = {}
+    cur2 = db.execute('SELECT agent_id, SUM(hours) as total FROM ot_logs GROUP BY agent_id')
+    for r in cur2.fetchall():
+        ot_summary[r['agent_id']] = r['total']
     rows=""
     for a in agents:
-        rows+=f"<tr><td><span class='badge badge-id'>{a['id']}</span></td><td><a href='/view/{a['id']}' class='text-decoration-none'><div class='fw-bold text-white'>{a['NAME'] or ''}</div><div style='font-size:11px;color:#94a3b8'>{a['NBS ID'] or ''} • {a['TENCENT ID'] or ''}</div></a></td><td><span class='badge bg-dark border'>{a['TENCENT ID'] or ''}</span></td><td>{a['PHONE NAME'] or ''}</td><td><code style='color:#fbbf24'>{a['HEADSET SN'] or ''}</code></td><td>{a['IBAS'] or ''}</td><td>{a['DJANGO'] or ''}</td><td>{a['NT LOG IN'] or ''}</td><td>{a['Sales Force'] or ''}</td><td>{a['ZOHO'] or ''}</td><td>{a['BSS WEB'] or ''}</td><td>{a['DATE HIRED'] or ''}</td><td style='max-width:180px;overflow:hidden;text-overflow:ellipsis'>{a['EMAIL'] or ''}</td><td>{a['BIRTHDAY'] or ''}</td><td style='max-width:200px;overflow:hidden;text-overflow:ellipsis'>{a['ADDRESS'] or ''}</td><td><b>{a['CONTACT NO.'] or ''}</b></td><td><a href='/view/{a['id']}' class='btn btn-sm btn-outline-light'><i class='bi bi-eye'></i></a> <a href='/edit/{a['id']}' class='btn btn-sm btn-outline-warning'><i class='bi bi-pencil'></i></a></td></tr>"
-    content=f"""
-    <div class="card p-3 mb-3"><form class="d-flex gap-2" method="get"><div class="input-group"><span class="input-group-text" style="background:#0f172a;border:1px solid #334155;color:#94a3b8"><i class="bi bi-search"></i></span><input name="q" value="{q}" class="form-control search-box" placeholder="Search lahat ng fields..."></div><button class="btn btn-light">Search</button></form></div>
-    <div class="card p-0 overflow-hidden"><div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th>ID</th><th>Agent (click for full details)</th><th>Tencent</th><th>Phone</th><th>Headset</th><th>IBAS</th><th>Django</th><th>NT Login</th><th>SalesForce</th><th>ZOHO</th><th>BSS</th><th>Hired</th><th>Email</th><th>Bday</th><th>Address</th><th>Contact</th><th>Action</th></tr></thead><tbody>{rows if rows else '<tr><td colspan=17 class=text-center p-5>Walang laman pa - Add Agent ka boss</td></tr>'}</tbody></table></div></div>
-    <div class="scroll-hint">← Scroll sideways para makita lahat ng 16 fields • Click name para full executive view • Auto-save pag nag-add ka →</div>
-    <div class="card mt-3 p-3" style="background:#0f172a;border:1px dashed #fbbf24"><small style="color:#fbbf24"><i class="bi bi-info-circle"></i> <b>DYNAMIC DB TIP:</b> Pag nag-add ka ng bagong agent, auto save sa Agent.db. Para hindi mawala pag nag-redeploy, i-download mo yung Agent.db sa Render Shell at i-upload mo ulit sa GitHub. Pero sa ngayon, habang hindi ka nagde-deploy, safe lahat!</small></div>
-    """
+        total = ot_summary.get(a['id'], 0)
+        rows+=f"<tr><td><span class='badge badge-id'>{a['id']}</span></td><td><a href='/view/{a['id']}' class='text-decoration-none'><div class='fw-bold text-white'>{a['NAME'] or ''}</div><div style='font-size:11px;color:#94a3b8'>{a['NBS ID'] or ''}</div></a></td><td>{a['TENCENT ID'] or ''}</td><td>{a['PHONE NAME'] or ''}</td><td>{a['CONTACT NO.'] or ''}</td><td><span class='badge bg-warning text-dark'>{total:.1f}h OT</span></td><td><a href='/view/{a['id']}' class='btn btn-sm btn-warning fw-bold'><i class='bi bi-clock'></i> OT</a></td></tr>"
+    content=f"<div class='card p-3 mb-3'><form class='d-flex gap-2' method='get'><input name='q' value='{q}' class='form-control search-box' placeholder='Search agent...'><button class='btn btn-light'>Search</button></form></div><div class='card p-0 overflow-hidden'><div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th>ID</th><th>Agent</th><th>Tencent</th><th>Phone</th><th>Contact</th><th>OT Total</th><th>Action</th></tr></thead><tbody>{rows if rows else '<tr><td colspan=7 class=text-center p-5>Empty</td></tr>'}</tbody></table></div></div>"
     return render_page(content, len(agents))
 
 @app.route("/view/<int:aid>")
@@ -90,10 +88,81 @@ def view(aid):
     db=get_db()
     a=db.execute('SELECT * FROM agents WHERE id=?',(aid,)).fetchone()
     if not a: return redirect("/")
+    logs = db.execute('SELECT * FROM ot_logs WHERE agent_id=? ORDER BY ot_date DESC', (aid,)).fetchall()
+    total = db.execute('SELECT SUM(hours) as t, SUM(CASE WHEN ot_type="RDOT" THEN hours ELSE 0 END) as rdot, SUM(CASE WHEN ot_type="REGULAR" THEN hours ELSE 0 END) as reg FROM ot_logs WHERE agent_id=?', (aid,)).fetchone()
+    t = total['t'] or 0
+    rdot = total['rdot'] or 0
+    reg = total['reg'] or 0
     fields=""
     for c in COLUMNS:
-        fields+=f"<div class='col-md-6 mb-3'><div class='detail-card p-3 rounded-3 h-100'><div class='field-label mb-1'>{c}</div><div class='field-value'>{a[c] or '<span style=color:#334155>— empty —</span>'}</div></div></div>"
-    content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'><i class='bi bi-arrow-left'></i> Back</a><div class='row'><div class='col-md-4'><div class='card p-4 text-center'><div style='width:80px;height:80px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;font-weight:800;color:#0f172a'>{(a['NAME'] or 'A')[0]}</div><div class='fw-bold fs-4 text-white'>{a['NAME'] or ''}</div><div class='field-label'>{a['NBS ID'] or ''} • {a['TENCENT ID'] or ''}</div><hr style='border-color:#334155'><div class='d-grid gap-2 mt-4'><a href='/edit/{a['id']}' class='btn btn-warning fw-bold'>Edit Agent</a><form method='post' action='/delete/{a['id']}' onsubmit=\"return confirm('Delete?')\"><button class='btn btn-outline-danger w-100'>Delete</button></form></div></div></div><div class='col-md-8'><div class='card p-4'><h5 class='fw-bold text-white mb-3'><i class='bi bi-person-badge me-2 text-warning'></i>Full Details - Lahat ng 16 Fields</h5><div class='row'>{fields}</div></div></div></div>"
+        fields+=f"<div class='col-md-6 mb-2'><div class='detail-card p-2 rounded-3'><div class='field-label'>{c}</div><div class='field-value'>{a[c] or '-'} </div></div></div>"
+    ot_rows=""
+    for log in logs:
+        badge = "bg-danger" if log['ot_type']=="RDOT" else "bg-success"
+        ot_rows+=f"<tr><td>{log['ot_date']}</td><td><span class='badge {badge}'>{log['ot_type']}</span></td><td><b>{log['hours']}h</b></td><td>{log['remarks'] or ''}</td><td><form method='post' action='/delete_ot/{log['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>"
+    today = datetime.now().strftime("%Y-%m-%d")
+    content=f"""
+    <a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a>
+    <div class='row'>
+        <div class='col-md-4'>
+            <div class='card p-4 text-center'>
+                <div style='width:70px;height:70px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;font-weight:800;color:#0f172a'>{(a['NAME'] or 'A')[0]}</div>
+                <div class='fw-bold fs-5 text-white'>{a['NAME']}</div>
+                <div class='row mt-3 g-2'>
+                    <div class='col-4'><div class='detail-card p-2 rounded'><div class='field-label'>TOTAL</div><div class='fw-bold text-warning'>{t:.1f}h</div></div></div>
+                    <div class='col-4'><div class='detail-card p-2 rounded'><div class='field-label'>REG OT</div><div class='fw-bold text-success'>{reg:.1f}h</div></div></div>
+                    <div class='col-4'><div class='detail-card p-2 rounded'><div class='field-label'>RDOT</div><div class='fw-bold text-danger'>{rdot:.1f}h</div></div></div>
+                </div>
+                <hr style='border-color:#334155'>
+                <div class='row text-start'>{fields}</div>
+            </div>
+        </div>
+        <div class='col-md-8'>
+            <div class='card p-4 mb-3' style='border:1px solid #fbbf24'>
+                <h5 class='fw-bold text-white'>Add Rendered OT</h5>
+                <form method='post' action='/add_ot/{a['id']}' class='row g-2 mt-2'>
+                    <div class='col-md-3'><label class='field-label'>Date</label><input type='date' name='ot_date' value='{today}' class='form-control' style='background:#0f172a;border:1px solid #334155;color:white' required></div>
+                    <div class='col-md-3'><label class='field-label'>OT Type</label><select name='ot_type' class='form-select' style='background:#0f172a;border:1px solid #334155;color:white'><option value='REGULAR'>REGULAR OT</option><option value='RDOT'>REST DAY OT (RDOT)</option></select></div>
+                    <div class='col-md-2'><label class='field-label'>Hours</label><input type='number' step='0.5' name='hours' class='form-control' style='background:#0f172a;border:1px solid #334155;color:white' placeholder='2.5' required></div>
+                    <div class='col-md-4'><label class='field-label'>Remarks</label><input name='remarks' class='form-control' style='background:#0f172a;border:1px solid #334155;color:white' placeholder='Reason'></div>
+                    <div class='col-12'><button class='btn btn-warning fw-bold w-100'>Save OT for {a['NAME']}</button></div>
+                </form>
+            </div>
+            <div class='card p-0 overflow-hidden'><div class='p-3 d-flex justify-content-between'><h6 class='fw-bold mb-0'>OT History</h6><span class='badge bg-dark'>{len(logs)} records</span></div><div class='table-responsive'><table class='table mb-0'><thead><tr><th>Date</th><th>Type</th><th>Hours</th><th>Remarks</th><th></th></tr></thead><tbody>{ot_rows if ot_rows else '<tr><td colspan=5 class=text-center p-4>No OT yet</td></tr>'}</tbody></table></div></div>
+        </div>
+    </div>
+    """
+    cnt=db.execute('SELECT COUNT(*) FROM agents').fetchone()[0]
+    return render_page(content, cnt)
+
+@app.route("/add_ot/<int:aid>", methods=["POST"])
+def add_ot(aid):
+    init_db()
+    db=get_db()
+    db.execute('INSERT INTO ot_logs (agent_id, ot_date, ot_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',
+               (aid, request.form.get('ot_date'), request.form.get('ot_type'), float(request.form.get('hours',0)), request.form.get('remarks',''), datetime.now().isoformat()))
+    db.commit()
+    return redirect(f"/view/{aid}")
+
+@app.route("/delete_ot/<int:oid>", methods=["POST"])
+def delete_ot(oid):
+    init_db()
+    db=get_db()
+    cur=db.execute('SELECT agent_id FROM ot_logs WHERE id=?',(oid,)).fetchone()
+    aid = cur['agent_id'] if cur else 0
+    db.execute('DELETE FROM ot_logs WHERE id=?',(oid,))
+    db.commit()
+    return redirect(f"/view/{aid}" if aid else "/")
+
+@app.route("/ot_report")
+def ot_report():
+    init_db()
+    db=get_db()
+    cur=db.execute('SELECT a.id, a.NAME, a."TENCENT ID", SUM(o.hours) as total, SUM(CASE WHEN o.ot_type="REGULAR" THEN o.hours ELSE 0 END) as reg, SUM(CASE WHEN o.ot_type="RDOT" THEN o.hours ELSE 0 END) as rdot FROM agents a LEFT JOIN ot_logs o ON a.id=o.agent_id GROUP BY a.id HAVING total>0 ORDER BY total DESC')
+    rows=cur.fetchall()
+    tr="".join([f"<tr><td>{r['id']}</td><td><a href='/view/{r['id']}' class='text-white fw-bold'>{r['NAME']}</a></td><td class='text-warning fw-bold'>{r['total']:.1f}h</td><td>{r['reg'] or 0:.1f}h</td><td>{r['rdot'] or 0:.1f}h</td></tr>" for r in rows])
+    gtotal=db.execute('SELECT SUM(hours) as t FROM ot_logs').fetchone()
+    content=f"<h4 class='fw-bold'>OT Report</h4><div class='card p-3 mb-3'><div class='fs-2 fw-bold text-warning'>Grand Total: {gtotal['t'] or 0:.1f} hours</div></div><div class='card p-0 overflow-hidden'><table class='table mb-0'><thead><tr><th>ID</th><th>Agent</th><th>Total</th><th>Regular</th><th>RDOT</th></tr></thead><tbody>{tr if tr else '<tr><td colspan=5 class=text-center>No OT</td></tr>'}</tbody></table></div>"
     cnt=db.execute('SELECT COUNT(*) FROM agents').fetchone()[0]
     return render_page(content, cnt)
 
@@ -119,9 +188,9 @@ def add_edit(aid=None):
     f=""
     for c in COLUMNS:
         v=ag[c] if ag else ""
-        f+=f"<div class='col-md-6 mb-3'><label class='field-label mb-1'>{c}</label><input name='{c}' value='{v}' class='form-control' style='background:#0f172a;border:1px solid #334155;color:white'></div>"
-    title="Edit Agent" if aid else "Add New Agent"
-    content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card p-4'><h4 class='fw-bold text-white mb-4'>{title}</h4><form method='post' class='row'>{f}<div class='col-12 mt-3'><button class='btn btn-warning fw-bold px-5'><i class='bi bi-save'></i> Save Agent</button></div></form></div>"
+        f+=f"<div class='col-md-6 mb-3'><label class='field-label'>{c}</label><input name='{c}' value='{v}' class='form-control' style='background:#0f172a;border:1px solid #334155;color:white'></div>"
+    title="Edit" if aid else "Add Agent"
+    content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card p-4'><h4>{title}</h4><form method='post' class='row'>{f}<div class='col-12 mt-3'><button class='btn btn-warning fw-bold'>Save</button></div></form></div>"
     cnt=db.execute('SELECT COUNT(*) FROM agents').fetchone()[0]
     return render_page(content, cnt)
 
@@ -130,9 +199,11 @@ def delete(aid):
     init_db()
     db=get_db()
     db.execute('DELETE FROM agents WHERE id=?',(aid,))
+    db.execute('DELETE FROM ot_logs WHERE agent_id=?',(aid,))
     db.commit()
     return redirect("/")
 
 if __name__=="__main__":
+    import os
     port=int(os.environ.get("PORT",5000))
     app.run(host="0.0.0.0",port=port)
