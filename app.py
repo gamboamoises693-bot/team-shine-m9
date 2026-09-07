@@ -22,8 +22,21 @@ def get_db():
 def init_db():
     db = get_db()
     cols_def = ", ".join([f'"{c}" TEXT' for c in COLUMNS])
-    db.execute(f'CREATE TABLE IF NOT EXISTS agents (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols_def})')
-    db.commit()
+    try:
+        db.execute(f'CREATE TABLE IF NOT EXISTS agents (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols_def})')
+        db.commit()
+        # check if old table has missing cols, add them
+        cur = db.execute('PRAGMA table_info(agents)')
+        existing = [r[1] for r in cur.fetchall()]
+        for c in COLUMNS:
+            if c not in existing:
+                db.execute(f'ALTER TABLE agents ADD COLUMN "{c}" TEXT')
+        db.commit()
+    except Exception as e:
+        # if totally broken, recreate
+        db.execute('DROP TABLE IF EXISTS agents')
+        db.execute(f'CREATE TABLE agents (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols_def})')
+        db.commit()
 
 @app.teardown_appcontext
 def close_connection(exception):
