@@ -48,18 +48,47 @@ BASE_HTML = """<!doctype html><html><head><meta name="viewport" content="width=d
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 <title>TEAM SHINE M9 - OT & LOSS</title>
 <style>
-body{background:#0f172a;color:#e2e8f0} .navbar{background:linear-gradient(90deg,#0f172a,#1e293b)!important;border-bottom:1px solid #334155}
-.card{background:#1e293b;border:1px solid #334155;border-radius:16px} .table{color:#e2e8f0}
-.table thead th{background:#0f172a;color:#94a3b8;border-bottom:2px solid #334155;font-size:11px;text-transform:uppercase;white-space:nowrap}
-.table tbody td{border-color:#1e293b;vertical-align:middle;font-size:13px;white-space:nowrap}
-.table-hover tbody tr:hover{background:#1e293b!important} .badge-id{background:#0f172a;border:1px solid #334155;color:#94a3b8}
-.btn-exec{background:#fbbf24;color:#0f172a;font-weight:700;border:none} .search-box{background:#0f172a;border:1px solid #334155;color:white}
-.detail-card{background:#0f172a;border:1px solid #334155} .field-label{color:#64748b;font-size:10px;text-transform:uppercase} .field-value{color:#f1f5f9;font-weight:500}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+body{background:#0a0e1a;color:#e2e8f0;font-family:'Inter',system-ui;overflow-x:hidden}
+.navbar{background:rgba(15,23,42,0.9)!important;backdrop-filter:blur(12px);border-bottom:1px solid #1e293b;position:sticky;top:0;z-index:1000}
+.card{background:#111827;border:1px solid #1f2937;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,0.3)}
+.table{color:#e2e8f0;margin-bottom:0}
+.table thead th{background:#0f172a;color:#94a3b8;border-bottom:2px solid #1e293b;font-size:11px;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;padding:14px 12px;font-weight:700}
+.table tbody td{border-color:#1f2937;vertical-align:middle;font-size:13px;padding:14px 12px;white-space:nowrap}
+.table-hover tbody tr:hover{background:#1e293b!important}
+.badge-id{background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 10px}
+.btn-exec{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0f172a;font-weight:800;border:none;border-radius:12px;padding:8px 18px;box-shadow:0 4px 15px rgba(251,191,36,0.3)}
+.btn-exec:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(251,191,36,0.4);color:#0f172a}
+.search-box{background:#0f172a;border:1px solid #1f2937;color:white;border-radius:12px;padding:12px}
+.search-box::placeholder{color:#475569}
+.detail-card{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:14px;transition:0.2s;height:100%;min-height:80px}
+.detail-card:hover{border-color:#334155;transform:translateY(-2px)}
+.field-label{color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:4px}
+.field-value{color:#f1f5f9;font-weight:600;font-size:13px;word-break:break-word;white-space:normal;line-height:1.4}
+.agent-avatar{width:80px;height:80px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:900;color:#0f172a;box-shadow:0 8px 25px rgba(251,191,36,0.3)}
+.stat-card{background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:16px;text-align:center}
+.stat-value{font-size:28px;font-weight:800;line-height:1}
+.ot-section{border:1px solid #065f46;background:linear-gradient(135deg,#111827,#064e3b0d);border-radius:20px}
+.loss-section{border:1px solid #7f1d1d;background:linear-gradient(135deg,#111827,#7f1d1d0d);border-radius:20px}
+.input-dark{background:#0a0e1a!important;border:1px solid #1f2937!important;color:white!important;border-radius:10px!important;padding:10px!important}
+.input-dark:focus{border-color:#fbbf24!important;box-shadow:0 0 0 3px rgba(251,191,36,0.1)!important}
+@media (max-width: 992px){
+  .desktop-grid{grid-template-columns:1fr!important}
+  .agent-sidebar{position:static!important}
+}
+.desktop-grid{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+.agent-sidebar{position:sticky;top:90px}
+.details-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.ot-loss-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width: 768px){
+  .ot-loss-grid{grid-template-columns:1fr}
+  .details-grid{grid-template-columns:1fr 1fr}
+}
 </style></head><body>
-<nav class="navbar navbar-dark p-3 sticky-top"><div class="container-fluid d-flex justify-content-between">
-<div class="d-flex align-items-center gap-3"><i class="bi bi-stars fs-4 text-warning"></i><div><div class="fw-bold fs-5">TEAM SHINE M9</div><div style="font-size:11px;color:#94a3b8;letter-spacing:2px">OT + LOSS HOURS TRACKER</div></div><span class="badge bg-warning text-dark ms-3">__COUNT__ AGENTS</span></div>
-<div class="d-flex gap-2"><a href="/" class="btn btn-sm btn-outline-light">Dashboard</a><a href="/ot_report" class="btn btn-sm btn-outline-warning">Reports</a><a href="/add" class="btn btn-sm btn-exec">+ Add Agent</a></div>
-</div></nav><div class="container-fluid p-4">__CONTENT__</div>
+<nav class="navbar navbar-dark p-3"><div class="container-fluid d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div class="d-flex align-items-center gap-3"><div style="width:42px;height:42px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center"><i class="bi bi-stars text-dark fs-5"></i></div><div><div class="fw-bold fs-5" style="letter-spacing:-0.5px">TEAM SHINE M9</div><div style="font-size:10px;color:#64748b;letter-spacing:2px;font-weight:700">OT + LOSS HOURS • EXECUTIVE</div></div><span class="badge bg-warning text-dark ms-2" style="border-radius:10px;padding:8px 12px;font-weight:800">__COUNT__ AGENTS</span></div>
+<div class="d-flex gap-2"><a href="/" class="btn btn-sm btn-outline-light" style="border-radius:10px"><i class="bi bi-grid"></i> Dashboard</a><a href="/ot_report" class="btn btn-sm btn-outline-warning" style="border-radius:10px"><i class="bi bi-graph-up"></i> Reports</a><a href="/add" class="btn btn-sm btn-exec"><i class="bi bi-plus-lg"></i> Add Agent</a></div>
+</div></nav><div class="container-fluid p-3 p-lg-4">__CONTENT__</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body></html>"""
 
@@ -108,52 +137,56 @@ def view(aid):
     reg = ot_total['reg'] or 0
     loss_t = loss_total['t'] or 0
     net = ot_t - loss_t
-    fields="".join([f"<div class='col-md-4 mb-2'><div class='detail-card p-2 rounded-3'><div class='field-label'>{c}</div><div class='field-value'>{a[c] or '-'}</div></div></div>" for c in COLUMNS])
-    ot_rows="".join([f"<tr><td>{l['ot_date']}</td><td><span class='badge {'bg-danger' if l['ot_type']=='RDOT' else 'bg-success'}'>{l['ot_type']}</span></td><td><b>{l['hours']}h</b></td><td>{l['remarks'] or ''}</td><td><form method='post' action='/delete_ot/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in ot_logs])
-    loss_rows="".join([f"<tr><td>{l['loss_date']}</td><td><span class='badge bg-danger'>{l['loss_type']}</span></td><td><b>{l['hours']}h</b></td><td>{l['remarks'] or ''}</td><td><form method='post' action='/delete_loss/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in loss_logs])
+    fields="".join([f"<div class='detail-card'><div class='field-label'>{c}</div><div class='field-value'>{a[c] or '<span style=color:#334155>— empty —</span>'}</div></div>" for c in COLUMNS])
+    ot_rows="".join([f"<tr><td>{l['ot_date']}</td><td><span class='badge {'bg-danger' if l['ot_type']=='RDOT' else 'bg-success'}'>{l['ot_type']}</span></td><td><b>{l['hours']}h</b></td><td>{l['remarks'] or ''}</td><td><form method='post' action='/delete_ot/{l['id']}'><button class='btn btn-sm btn-outline-danger' style='border-radius:8px'>X</button></form></td></tr>" for l in ot_logs])
+    loss_rows="".join([f"<tr><td>{l['loss_date']}</td><td><span class='badge bg-danger'>{l['loss_type']}</span></td><td><b>{l['hours']}h</b></td><td>{l['remarks'] or ''}</td><td><form method='post' action='/delete_loss/{l['id']}'><button class='btn btn-sm btn-outline-danger' style='border-radius:8px'>X</button></form></td></tr>" for l in loss_logs])
     today = datetime.now().strftime("%Y-%m-%d")
     content=f"""
-    <a href='/' class='btn btn-sm btn-outline-light mb-3'>Back Dashboard</a>
-    <div class='row'>
-        <div class='col-md-3'>
-            <div class='card p-3 text-center sticky-top' style='top:80px'>
-                <div style='width:60px;height:60px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:24px;font-weight:800;color:#0f172a'>{(a['NAME'] or 'A')[0]}</div>
-                <div class='fw-bold text-white'>{a['NAME']}</div><div class='field-label mb-3'>{a['NBS ID'] or ''}</div>
-                <div class='row g-2'>
-                    <div class='col-6'><div class='detail-card p-2 rounded'><div class='field-label'>TOTAL OT</div><div class='fw-bold text-success'>{ot_t:.1f}h</div><small style='font-size:10px'>Reg:{reg:.1f} RD:{rdot:.1f}</small></div></div>
-                    <div class='col-6'><div class='detail-card p-2 rounded'><div class='field-label'>LOSS HRS</div><div class='fw-bold text-danger'>{loss_t:.1f}h</div></div></div>
-                    <div class='col-12'><div class='detail-card p-2 rounded' style='border:1px solid #fbbf24'><div class='field-label'>NET (OT - LOSS)</div><div class='fs-4 fw-bold text-warning'>{net:+.1f}h</div></div></div>
+    <a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>← Back to Dashboard</a>
+    <div class='desktop-grid'>
+        <div class='agent-sidebar'>
+            <div class='card p-4 text-center'>
+                <div class='agent-avatar mx-auto mb-3'>{(a['NAME'] or 'A')[0]}</div>
+                <div class='fw-bold fs-5 text-white' style='word-break:break-word'>{a['NAME']}</div>
+                <div class='field-label mb-3'>{a['NBS ID'] or ''} • {a['TENCENT ID'] or ''}</div>
+                <div class='row g-2 mb-3'>
+                    <div class='col-6'><div class='stat-card'><div class='field-label'>TOTAL OT</div><div class='stat-value text-success'>{ot_t:.1f}h</div><div style='font-size:10px;color:#64748b'>Reg:{reg:.1f} RD:{rdot:.1f}</div></div></div>
+                    <div class='col-6'><div class='stat-card'><div class='field-label'>LOSS HRS</div><div class='stat-value text-danger'>{loss_t:.1f}h</div></div></div>
+                    <div class='col-12'><div class='stat-card' style='border:1px solid #fbbf24'><div class='field-label'>NET (OT - LOSS)</div><div class='stat-value text-warning' style='font-size:32px'>{net:+.1f}h</div></div></div>
                 </div>
-                <div class='row mt-3 text-start'>{fields}</div>
+                <div class='text-start'>
+                    <div class='field-label mb-2'>FULL PROFILE • 16 FIELDS</div>
+                    <div class='details-grid'>{fields}</div>
+                </div>
+                <div class='d-grid gap-2 mt-4'>
+                    <a href='/edit/{a['id']}' class='btn btn-outline-light' style='border-radius:12px'>Edit Agent</a>
+                    <form method='post' action='/delete/{a['id']}' onsubmit="return confirm('Delete agent?')"><button class='btn btn-outline-danger w-100' style='border-radius:12px'>Delete Agent</button></form>
+                </div>
             </div>
         </div>
-        <div class='col-md-9'>
-            <div class='row g-3'>
-                <div class='col-md-6'>
-                    <div class='card p-3' style='border:1px solid #22c55e'>
-                        <h6 class='fw-bold text-success'><i class='bi bi-plus-circle'></i> Add OT (Rendered OT)</h6>
-                        <form method='post' action='/add_ot/{a['id']}' class='row g-2 mt-1'>
-                            <div class='col-4'><label class='field-label'>Date</label><input type='date' name='ot_date' value='{today}' class='form-control form-control-sm' style='background:#0f172a;border:1px solid #334155;color:white' required></div>
-                            <div class='col-4'><label class='field-label'>Type</label><select name='ot_type' class='form-select form-select-sm' style='background:#0f172a;border:1px solid #334155;color:white'><option value='REGULAR'>NORMAL OT</option><option value='RDOT'>REST DAY OT</option></select></div>
-                            <div class='col-4'><label class='field-label'>Hours</label><input type='number' step='0.5' name='hours' class='form-control form-control-sm' style='background:#0f172a;border:1px solid #334155;color:white' placeholder='2.5' required></div>
-                            <div class='col-12'><input name='remarks' class='form-control form-control-sm' style='background:#0f172a;border:1px solid #334155;color:white' placeholder='Remarks - e.g. high volume'></div>
-                            <div class='col-12'><button class='btn btn-success btn-sm w-100 fw-bold'>Save OT</button></div>
-                        </form>
-                        <div class='table-responsive mt-3'><table class='table table-sm mb-0'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Remarks</th><th></th></tr></thead><tbody>{ot_rows if ot_rows else '<tr><td colspan=5 class=text-center>No OT yet</td></tr>'}</tbody></table></div>
-                    </div>
+        <div class='d-flex flex-column gap-3'>
+            <div class='ot-loss-grid'>
+                <div class='card p-4 ot-section'>
+                    <div class='d-flex justify-content-between align-items-center mb-3'><h6 class='fw-bold text-success mb-0'><i class='bi bi-plus-circle'></i> Add OT (Rendered OT)</h6><span class='badge bg-success'>{len(ot_logs)} records</span></div>
+                    <form method='post' action='/add_ot/{a['id']}' class='row g-2'>
+                        <div class='col-4'><label class='field-label'>Date</label><input type='date' name='ot_date' value='{today}' class='form-control input-dark' required></div>
+                        <div class='col-4'><label class='field-label'>Type</label><select name='ot_type' class='form-select input-dark'><option value='REGULAR'>NORMAL OT</option><option value='RDOT'>REST DAY OT</option></select></div>
+                        <div class='col-4'><label class='field-label'>Hours</label><input type='number' step='0.5' name='hours' class='form-control input-dark' placeholder='2.5' required></div>
+                        <div class='col-12'><label class='field-label'>Remarks</label><input name='remarks' class='form-control input-dark' placeholder='e.g. high volume, extended shift'></div>
+                        <div class='col-12'><button class='btn btn-success w-100 fw-bold' style='border-radius:12px'>Save OT - {a['NAME']}</button></div>
+                    </form>
+                    <div class='table-responsive mt-4' style='max-height:400px;overflow-y:auto'><table class='table table-sm mb-0'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Remarks</th><th></th></tr></thead><tbody>{ot_rows if ot_rows else '<tr><td colspan=5 class=text-center style=color:#475569;padding:20px>No OT yet - add on top</td></tr>'}</tbody></table></div>
                 </div>
-                <div class='col-md-6'>
-                    <div class='card p-3' style='border:1px solid #ef4444'>
-                        <h6 class='fw-bold text-danger'><i class='bi bi-dash-circle'></i> Add LOSS Hours</h6>
-                        <form method='post' action='/add_loss/{a['id']}' class='row g-2 mt-1'>
-                            <div class='col-4'><label class='field-label'>Date</label><input type='date' name='loss_date' value='{today}' class='form-control form-control-sm' style='background:#0f172a;border:1px solid #334155;color:white' required></div>
-                            <div class='col-4'><label class='field-label'>Type</label><select name='loss_type' class='form-select form-select-sm' style='background:#0f172a;border:1px solid #334155;color:white'><option value='LATE'>LATE</option><option value='UNDERTIME'>UNDERTIME</option><option value='ABSENT'>ABSENT (Hours)</option><option value='LOSS'>LOSS / NO LOG</option><option value='OTHERS'>OTHERS</option></select></div>
-                            <div class='col-4'><label class='field-label'>Hours</label><input type='number' step='0.5' name='hours' class='form-control form-control-sm' style='background:#0f172a;border:1px solid #334155;color:white' placeholder='1.5' required></div>
-                            <div class='col-12'><input name='remarks' class='form-control form-control-sm' style='background:#0f172a;border:1px solid #334155;color:white' placeholder='Remarks - e.g. late 30 mins, system issue'></div>
-                            <div class='col-12'><button class='btn btn-danger btn-sm w-100 fw-bold'>Save LOSS Hours</button></div>
-                        </form>
-                        <div class='table-responsive mt-3'><table class='table table-sm mb-0'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Remarks</th><th></th></tr></thead><tbody>{loss_rows if loss_rows else '<tr><td colspan=5 class=text-center>No Loss yet</td></tr>'}</tbody></table></div>
-                    </div>
+                <div class='card p-4 loss-section'>
+                    <div class='d-flex justify-content-between align-items-center mb-3'><h6 class='fw-bold text-danger mb-0'><i class='bi bi-dash-circle'></i> Add LOSS Hours</h6><span class='badge bg-danger'>{len(loss_logs)} records</span></div>
+                    <form method='post' action='/add_loss/{a['id']}' class='row g-2'>
+                        <div class='col-4'><label class='field-label'>Date</label><input type='date' name='loss_date' value='{today}' class='form-control input-dark' required></div>
+                        <div class='col-4'><label class='field-label'>Type</label><select name='loss_type' class='form-select input-dark'><option value='LATE'>LATE</option><option value='UNDERTIME'>UNDERTIME</option><option value='ABSENT'>ABSENT</option><option value='LOSS'>LOSS HRS</option><option value='OTHERS'>OTHERS</option></select></div>
+                        <div class='col-4'><label class='field-label'>Hours</label><input type='number' step='0.5' name='hours' class='form-control input-dark' placeholder='1.5' required></div>
+                        <div class='col-12'><label class='field-label'>Remarks</label><input name='remarks' class='form-control input-dark' placeholder='e.g. late 30 mins, system issue'></div>
+                        <div class='col-12'><button class='btn btn-danger w-100 fw-bold' style='border-radius:12px'>Save LOSS Hours</button></div>
+                    </form>
+                    <div class='table-responsive mt-4' style='max-height:400px;overflow-y:auto'><table class='table table-sm mb-0'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Remarks</th><th></th></tr></thead><tbody>{loss_rows if loss_rows else '<tr><td colspan=5 class=text-center style=color:#475569;padding:20px>No Loss yet</td></tr>'}</tbody></table></div>
                 </div>
             </div>
         </div>
