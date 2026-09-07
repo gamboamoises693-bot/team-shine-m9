@@ -228,7 +228,7 @@ def ot_report():
     </div>
     <div class='row g-3 mb-4'>
         <div class='col-lg-8'><div class='card p-4'><h6 class='fw-bold mb-3 text-white'><i class='bi bi-graph-up text-success'></i> OT vs LOSS Comparison</h6><canvas id='otLossChart' height='120'></canvas></div></div>
-        <div class='col-lg-4'><div class='card p-4 h-100'><h6 class='fw-bold mb-3 text-white'><i class='bi bi-pie-chart text-warning'></i> Distribution</h6><canvas id='pieChart'></canvas></div></div>
+        <div class='col-lg-4'><div class='card p-4'><h6 class='fw-bold mb-3 text-white'><i class='bi bi-pie-chart text-warning'></i> Distribution (Small)</h6><div style='max-height:260px;display:flex;justify-content:center'><canvas id='pieChart' style='max-height:220px!important'></canvas></div><div class='mt-2 d-flex justify-content-center gap-3 small'><span style='color:#22c55e'>● Regular OT</span><span style='color:#f59e0b'>● RDOT</span><span style='color:#ef4444'>● LOSS</span></div></div></div>
     </div>
     <div class='row g-3 mb-4'>
         <div class='col-md-6'><div class='card p-4'><h6 class='fw-bold text-success'>Top 10 OT</h6><canvas id='topOtChart' height='120'></canvas></div></div>
