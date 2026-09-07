@@ -1,30 +1,36 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="card p-4">
-  <h4 class="mb-3">{{title}}</h4>
-  <form method="post">
-    <div class="row g-3">
-      <div class="col-md-6"><label>NAME</label><input name="NAME" class="form-control" value="{{agent['NAME'] if agent else ''}}" required></div>
-      <div class="col-md-3"><label>TENCENT ID</label><input name="TENCENT ID" class="form-control" value="{{agent['TENCENT ID'] if agent else ''}}"></div>
-      <div class="col-md-3"><label>DATE HIRED</label><input type="date" name="DATE HIRED" class="form-control" value="{{agent['DATE HIRED'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>PHONE NAME</label><input name="PHONE NAME" class="form-control" value="{{agent['PHONE NAME'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>NBS ID</label><input name="NBS ID" class="form-control" value="{{agent['NBS ID'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>HEADSET SN</label><input name="HEADSET SN" class="form-control" value="{{agent['HEADSET SN'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>IBAS</label><input name="IBAS" class="form-control" value="{{agent['IBAS'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>DJANGO</label><input name="DJANGO" class="form-control" value="{{agent['DJANGO'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>NT LOG IN</label><input name="NT LOG IN" class="form-control" value="{{agent['NT LOG IN'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>Sales Force</label><input name="Sales Force" class="form-control" value="{{agent['Sales Force'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>ZOHO</label><input name="ZOHO" class="form-control" value="{{agent['ZOHO'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>BSS WEB</label><input name="BSS WEB" class="form-control" value="{{agent['BSS WEB'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>EMAIL</label><input name="EMAIL" class="form-control" value="{{agent['EMAIL'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>BIRTHDAY</label><input type="date" name="BIRTHDAY" class="form-control" value="{{agent['BIRTHDAY'] if agent else ''}}"></div>
-      <div class="col-md-4"><label>CONTACT NO.</label><input name="CONTACT NO." class="form-control" value="{{agent['CONTACT NO.'] if agent else ''}}"></div>
-      <div class="col-12"><label>ADDRESS</label><input name="ADDRESS" class="form-control" value="{{agent['ADDRESS'] if agent else ''}}"></div>
-    </div>
-    <div class="mt-4 d-flex gap-2">
-      <button class="btn btn-primary">Save</button>
-      <a href="/" class="btn btn-light">Cancel</a>
-    </div>
-  </form>
-</div>
+{% extends "base.html" %} {% block content %}
+{{title}}
+NAME
+{{agent['NAME'] if agent else ''}}
+TENCENT ID
+{{agent['TENCENT ID'] if agent else ''}}
+DATE HIRED
+ 
+PHONE NAME
+{{agent['PHONE NAME'] if agent else ''}}
+NBS ID
+{{agent['NBS ID'] if agent else ''}}
+HEADSET SN
+{{agent['HEADSET SN'] if agent else ''}}
+IBAS
+{{agent['IBAS'] if agent else ''}}
+DJANGO
+{{agent['DJANGO'] if agent else ''}}
+NT LOG IN
+{{agent['NT LOG IN'] if agent else ''}}
+Sales Force
+{{agent['Sales Force'] if agent else ''}}
+ZOHO
+{{agent['ZOHO'] if agent else ''}}
+BSS WEB
+{{agent['BSS WEB'] if agent else ''}}
+EMAIL
+{{agent['EMAIL'] if agent else ''}}
+BIRTHDAY
+ 
+CONTACT NO.
+{{agent['CONTACT NO.'] if agent else ''}}
+ADDRESS
+{{agent['ADDRESS'] if agent else ''}}
+Save Cancel
 {% endblock %}
