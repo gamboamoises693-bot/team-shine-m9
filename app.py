@@ -1,20 +1,38 @@
 
-import os, sqlite3
+import os, sqlite3, html
 from flask import Flask, request, redirect, g, Response
 from datetime import datetime
 import io, csv, json
 
 app = Flask(__name__)
-DATABASE = "/tmp/Agent.db"
+
+# --- Persistent storage fix -------------------------------------------------
+# /tmp is wiped every time Render redeploys or restarts your service - that is
+# why your data disappeared. Point DATABASE at a Render "Persistent Disk"
+# instead (Render dashboard -> your service -> Disks -> Add Disk, e.g. mount
+# path /var/data), then set the env var DATABASE_PATH=/var/data/agent.db.
+# Locally (no env var set) it just uses a file next to app.py, which is fine
+# for development.
+DATABASE = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent.db"))
+_db_dir = os.path.dirname(DATABASE)
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
+
+def esc(v):
+    """Escape any value before dropping it into raw HTML strings, to prevent stored/reflected XSS."""
+    return html.escape(str(v)) if v is not None else ""
 
 def get_db():
     db = getattr(g, '_db', None)
     if db is None:
-        if not os.path.exists(DATABASE) and os.path.exists("Agent.db"):
+        need_seed = not os.path.exists(DATABASE) and os.path.exists("Agent.db")
+        if need_seed:
             import shutil
             shutil.copy("Agent.db", DATABASE)
         db = g._db = sqlite3.connect(DATABASE)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA journal_mode=WAL")   # safer concurrent reads/writes, fewer "database is locked" errors
+        db.execute("PRAGMA foreign_keys=ON")
     return db
 
 def init_db():
@@ -33,6 +51,7 @@ def close_connection(ex):
         db.close()
 
 BASE_HTML = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+__REFRESH__
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 <title>TEAM SHINE M9 - Fixed Graph</title>
@@ -74,8 +93,12 @@ body{background:#080c14;color:#e2e8f0;font-family:system-ui}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body></html>"""
 
-def render_page(content, count=0):
-    return BASE_HTML.replace("__CONTENT__", content).replace("__COUNT__", str(count))
+def render_page(content, count=0, refresh_secs=0):
+    # refresh_secs>0 makes the page auto-reload itself, so if data changes on
+    # another device/tab, everyone looking at the dashboard sees it update
+    # without hitting refresh manually.
+    refresh_tag = f'<meta http-equiv="refresh" content="{refresh_secs}">' if refresh_secs else ""
+    return BASE_HTML.replace("__REFRESH__", refresh_tag).replace("__CONTENT__", content).replace("__COUNT__", str(count))
 
 @app.route("/")
 def index():
@@ -95,9 +118,9 @@ def index():
         ot = ot_sum.get(a['id'], 0) or 0
         loss = loss_sum.get(a['id'], 0) or 0
         net = ot - loss
-        rows+=f"<tr><td><span class='badge badge-id'>{a['id']}</span></td><td><a href='/view/{a['id']}' class='agent-name-dark text-decoration-none'>{a['NAME'] or ''}<br><small class='agent-sub'>{a['NBS ID'] or ''} • {a['TENCENT ID'] or ''}</small></a></td><td><span class='badge bg-dark border text-light'>{a['TENCENT ID'] or ''}</span></td><td style='color:#cbd5e1'>{a['PHONE NAME'] or ''}</td><td><span class='badge bg-success'>{ot:.1f}h</span></td><td><span class='badge bg-danger'>{loss:.1f}h</span></td><td><span class='badge bg-warning text-dark fw-bold'>{net:+.1f}h</span></td><td><a href='/view/{a['id']}' class='btn btn-sm btn-warning fw-bold' style='border-radius:10px'>Manage</a></td></tr>"
-    content=f"<div class='card p-3 mb-3'><form class='d-flex gap-2' method='get'><input name='q' value='{q}' class='form-control search-box' placeholder='Search agent...'><button class='btn btn-light' style='border-radius:12px'>Search</button></form><div class='mt-2 small' style='color:#22c55e'>● Fixed Graph Height - Bar graphs will NOT auto-adjust anymore!</div></div><div class='card p-0 overflow-hidden'><div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th>ID</th><th>AGENT</th><th>TENCENT</th><th>PHONE</th><th>OT</th><th>LOSS</th><th>NET</th><th>ACTION</th></tr></thead><tbody>{rows if rows else '<tr><td colspan=8 class=text-center p-5>Empty</td></tr>'}</tbody></table></div></div>"
-    return render_page(content, len(agents))
+        rows+=f"<tr><td><span class='badge badge-id'>{a['id']}</span></td><td><a href='/view/{a['id']}' class='agent-name-dark text-decoration-none'>{esc(a['NAME'])}<br><small class='agent-sub'>{esc(a['NBS ID'])} • {esc(a['TENCENT ID'])}</small></a></td><td><span class='badge bg-dark border text-light'>{esc(a['TENCENT ID'])}</span></td><td style='color:#cbd5e1'>{esc(a['PHONE NAME'])}</td><td><span class='badge bg-success'>{ot:.1f}h</span></td><td><span class='badge bg-danger'>{loss:.1f}h</span></td><td><span class='badge bg-warning text-dark fw-bold'>{net:+.1f}h</span></td><td><a href='/view/{a['id']}' class='btn btn-sm btn-warning fw-bold' style='border-radius:10px'>Manage</a></td></tr>"
+    content=f"<div class='card p-3 mb-3'><form class='d-flex gap-2' method='get'><input name='q' value='{esc(q)}' class='form-control search-box' placeholder='Search agent...'><button class='btn btn-light' style='border-radius:12px'>Search</button></form><div class='mt-2 small' style='color:#22c55e'>● Fixed Graph Height - Bar graphs will NOT auto-adjust anymore!</div></div><div class='card p-0 overflow-hidden'><div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th>ID</th><th>AGENT</th><th>TENCENT</th><th>PHONE</th><th>OT</th><th>LOSS</th><th>NET</th><th>ACTION</th></tr></thead><tbody>{rows if rows else '<tr><td colspan=8 class=text-center p-5>Empty</td></tr>'}</tbody></table></div></div>"
+    return render_page(content, len(agents), refresh_secs=20)
 
 @app.route("/view/<int:aid>")
 def view(aid):
@@ -109,18 +132,19 @@ def view(aid):
     ot_total = db.execute('SELECT SUM(hours) as t, SUM(CASE WHEN ot_type="RDOT" THEN hours ELSE 0 END) as rdot, SUM(CASE WHEN ot_type="REGULAR" THEN hours ELSE 0 END) as reg FROM ot_logs WHERE agent_id=?', (aid,)).fetchone()
     loss_total = db.execute('SELECT SUM(hours) as t FROM loss_logs WHERE agent_id=?', (aid,)).fetchone()
     ot_t = ot_total['t'] or 0; rdot = ot_total['rdot'] or 0; reg = ot_total['reg'] or 0; loss_t = loss_total['t'] or 0; net = ot_t - loss_t
-    fields_html="".join([f"<div class='detail-card'><div class='field-label'>{c}</div><div class='field-value'>{a[c] or '<span style=color:#334155>—</span>'}</div></div>" for c in ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']])
-    ot_rows="".join([f"<tr><td style='color:#e2e8f0'>{l['ot_date']}</td><td><span class='badge {'bg-danger' if l['ot_type']=='RDOT' else 'bg-success'}'>{l['ot_type']}</span></td><td style='color:#22c55e;font-weight:700'>{l['hours']}h</td><td style='color:#94a3b8'>{l['remarks'] or ''}</td><td><form method='post' action='/delete_ot/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in ot_logs])
-    loss_rows="".join([f"<tr><td style='color:#e2e8f0'>{l['loss_date']}</td><td><span class='badge bg-danger'>{l['loss_type']}</span></td><td style='color:#ef4444;font-weight:700'>{l['hours']}h</td><td style='color:#94a3b8'>{l['remarks'] or ''}</td><td><form method='post' action='/delete_loss/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in loss_logs])
+    fields_html="".join([f"<div class='detail-card'><div class='field-label'>{esc(c)}</div><div class='field-value'>{esc(a[c]) if a[c] else '<span style=color:#334155>—</span>'}</div></div>" for c in ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']])
+    ot_rows="".join([f"<tr><td style='color:#e2e8f0'>{esc(l['ot_date'])}</td><td><span class='badge {'bg-danger' if l['ot_type']=='RDOT' else 'bg-success'}'>{esc(l['ot_type'])}</span></td><td style='color:#22c55e;font-weight:700'>{l['hours']}h</td><td style='color:#94a3b8'>{esc(l['remarks'])}</td><td><form method='post' action='/delete_ot/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in ot_logs])
+    loss_rows="".join([f"<tr><td style='color:#e2e8f0'>{esc(l['loss_date'])}</td><td><span class='badge bg-danger'>{esc(l['loss_type'])}</span></td><td style='color:#ef4444;font-weight:700'>{l['hours']}h</td><td style='color:#94a3b8'>{esc(l['remarks'])}</td><td><form method='post' action='/delete_loss/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in loss_logs])
     today = datetime.now().strftime("%Y-%m-%d")
     aname = a['NAME'] or 'A'
+    aname_safe = esc(aname)
     content=f"""
     <a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>← Back Dashboard</a>
     <div class='desktop-grid'>
         <div class='agent-sidebar'>
             <div class='card p-4 text-center'>
-                <div class='agent-avatar mx-auto mb-3'>{aname[0]}</div>
-                <div class='fw-bold fs-5 text-white' style='word-break:break-word'>{aname}</div>
+                <div class='agent-avatar mx-auto mb-3'>{esc(aname[0])}</div>
+                <div class='fw-bold fs-5 text-white' style='word-break:break-word'>{aname_safe}</div>
                 <div class='row g-2 my-3'>
                     <div class='col-6'><div class='stat-card'><div class='field-label'>TOTAL OT</div><div class='stat-value text-success'>{ot_t:.1f}h</div><div style='font-size:10px;color:#64748b'>Reg:{reg:.1f} RD:{rdot:.1f}</div></div></div>
                     <div class='col-6'><div class='stat-card'><div class='field-label'>LOSS</div><div class='stat-value text-danger'>{loss_t:.1f}h</div></div></div>
@@ -157,13 +181,21 @@ def view(aid):
 @app.route("/add_ot/<int:aid>", methods=["POST"])
 def add_ot(aid):
     init_db(); db=get_db()
-    db.execute('INSERT INTO ot_logs (agent_id, ot_date, ot_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',(aid, request.form.get('ot_date'), request.form.get('ot_type'), float(request.form.get('hours',0)), request.form.get('remarks',''), datetime.now().isoformat()))
+    try:
+        hours = float(request.form.get('hours', 0) or 0)
+    except ValueError:
+        hours = 0.0
+    db.execute('INSERT INTO ot_logs (agent_id, ot_date, ot_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',(aid, request.form.get('ot_date'), request.form.get('ot_type'), hours, request.form.get('remarks',''), datetime.now().isoformat()))
     db.commit(); return redirect(f"/view/{aid}")
 
 @app.route("/add_loss/<int:aid>", methods=["POST"])
 def add_loss(aid):
     init_db(); db=get_db()
-    db.execute('INSERT INTO loss_logs (agent_id, loss_date, loss_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',(aid, request.form.get('loss_date'), request.form.get('loss_type'), float(request.form.get('hours',0)), request.form.get('remarks',''), datetime.now().isoformat()))
+    try:
+        hours = float(request.form.get('hours', 0) or 0)
+    except ValueError:
+        hours = 0.0
+    db.execute('INSERT INTO loss_logs (agent_id, loss_date, loss_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',(aid, request.form.get('loss_date'), request.form.get('loss_type'), hours, request.form.get('remarks',''), datetime.now().isoformat()))
     db.commit(); return redirect(f"/view/{aid}")
 
 @app.route("/delete_ot/<int:oid>", methods=["POST"])
@@ -198,7 +230,7 @@ def ot_report():
         if ot==0 and loss==0: continue
         labels.append((a['NAME'] or '').split(',')[0])
         ot_data.append(round(ot,1)); loss_data.append(round(loss,1))
-        table_rows+=f"<tr><td style='color:#94a3b8'>{a['id']}</td><td><div class='agent-name-dark'>{a['NAME']}</div><small class='agent-sub'>{a['NBS ID'] or ''} • {a['TENCENT ID'] or ''}</small></td><td style='color:#22c55e;font-weight:700'>{ot:.1f}h</td><td style='color:#ef4444;font-weight:700'>{loss:.1f}h</td><td style='color:#fbbf24;font-weight:800'>{ot-loss:+.1f}h</td></tr>"
+        table_rows+=f"<tr><td style='color:#94a3b8'>{a['id']}</td><td><div class='agent-name-dark'>{esc(a['NAME'])}</div><small class='agent-sub'>{esc(a['NBS ID'])} • {esc(a['TENCENT ID'])}</small></td><td style='color:#22c55e;font-weight:700'>{ot:.1f}h</td><td style='color:#ef4444;font-weight:700'>{loss:.1f}h</td><td style='color:#fbbf24;font-weight:800'>{ot-loss:+.1f}h</td></tr>"
     top_ot = sorted([(a['NAME'], ot_map.get(a['id'],0) or 0) for a in agents if ot_map.get(a['id'],0)], key=lambda x: x[1], reverse=True)[:10]
     top_loss = sorted([(a['NAME'], loss_map.get(a['id'],0) or 0) for a in agents if loss_map.get(a['id'],0)], key=lambda x: x[1], reverse=True)[:10]
     content=f"""
@@ -236,17 +268,17 @@ def ot_report():
     new Chart(document.getElementById('topOtChart'), {{
         type:'bar',
         data:{{labels:{json.dumps([x[0].split(',')[0] for x in top_ot])}, datasets:[{{data:{json.dumps([x[1] for x in top_ot])}, backgroundColor:'#22c55e', borderRadius:6, maxBarThickness:30}}]}},
-        options:{{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}}, grid:{{color:'#1f2937'}}}}, y:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}}}
+        options:{{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}, grid:{{color:'#1f2937'}}}}, y:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}}}
     }});
     new Chart(document.getElementById('topLossChart'), {{
         type:'bar',
         data:{{labels:{json.dumps([x[0].split(',')[0] for x in top_loss])}, datasets:[{{data:{json.dumps([x[1] for x in top_loss])}, backgroundColor:'#ef4444', borderRadius:6, maxBarThickness:30}}]}},
-        options:{{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}}, grid:{{color:'#1f2937'}}}}, y:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}}}
+        options:{{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}, grid:{{color:'#1f2937'}}}}, y:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}}}
     }});
     </script>
     """
     cnt=db.execute('SELECT COUNT(*) FROM agents').fetchone()[0]
-    return render_page(content, cnt)
+    return render_page(content, cnt, refresh_secs=20)
 
 @app.route("/export_csv")
 def export_csv():
@@ -287,10 +319,11 @@ def add_edit(aid=None):
         else:
             ph=", ".join(["?"]*len(cols))
             cq=", ".join([f'"{c}"' for c in cols])
-            db.execute(f'INSERT INTO agents ({cq}) VALUES ({ph})', vals)
+            cur = db.execute(f'INSERT INTO agents ({cq}) VALUES ({ph})', vals)
+            aid = cur.lastrowid
         db.commit()
-        return redirect(f"/view/{aid}" if aid else "/")
-    f="".join([f"<div class='col-md-6 mb-3'><label class='field-label'>{c}</label><input name='{c}' value='{(ag[c] if ag else '') or ''}' class='form-control input-dark'></div>" for c in ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']])
+        return redirect(f"/view/{aid}")
+    f="".join([f"<div class='col-md-6 mb-3'><label class='field-label'>{esc(c)}</label><input name='{c}' value='{esc(ag[c]) if (ag and ag[c]) else ''}' class='form-control input-dark'></div>" for c in ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']])
     title="Edit Agent" if aid else "Add Agent"
     content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>Back</a><div class='card p-4'><h4 class='fw-bold'>{title}</h4><form method='post' class='row'>{f}<div class='col-12 mt-3'><button class='btn btn-warning fw-bold'>Save</button></div></form></div>"
     cnt=db.execute('SELECT COUNT(*) FROM agents').fetchone()[0]
