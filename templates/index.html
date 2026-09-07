@@ -1,8 +1,0 @@
-{% extends "base.html" %} {% block content %}
-{{q}}
-Search
-{% for a in agents %} {% endfor %}
-ID	Name	Tencent	Phone	Headset	Date Hired	Contact	Action
-{{a["id"]}}	{{a["NAME"]}}
-{{a["NBS ID"]}}	{{a["TENCENT ID"]}}	{{a["PHONE NAME"]}}	{% if a["HEADSET SN"] %}{{a["HEADSET SN"]}}{% else %}Missing{% endif %}	{{a["DATE HIRED"]}}	{{a["CONTACT NO."]}}	Edit Del
-{% endblock %}
