@@ -48,7 +48,7 @@ BASE_HTML = """
 <style>body{background:#f4f6f9}.navbar{background:#0d1b3e!important}</style>
 </head><body>
 <nav class="navbar navbar-dark p-3"><div class="container"><a class="navbar-brand fw-bold" href="/">✨ TEAM SHINE M9 - Agent System</a>
-<a href="/add" class="btn btn-warning btn-sm fw-bold">+ Add Agent</a></div></nav>
+<a href="/import" class="btn btn-light btn-sm me-2">Import DB</a><a href="/add" class="btn btn-warning btn-sm fw-bold">+ Add Agent</a></div></nav>
 <div class="container mt-4">{CONTENT}</div></body></html>
 """
 
@@ -155,6 +155,63 @@ def delete(agent_id):
     db.execute('DELETE FROM agents WHERE id=?', (agent_id,))
     db.commit()
     return redirect(url_for("index"))
+
+
+@app.route("/import", methods=["GET","POST"])
+def import_data():
+    init_db()
+    msg = ""
+    if request.method == "POST":
+        f = request.files.get("file")
+        if f:
+            # try as sqlite db
+            try:
+                import tempfile, shutil
+                tmp = "/tmp/upload.db"
+                f.save(tmp)
+                # check if sqlite
+                conn = sqlite3.connect(tmp)
+                cur = conn.cursor()
+                try:
+                    cur.execute("SELECT * FROM agents")
+                    rows = cur.fetchall()
+                    cols = [d[0] for d in cur.description]
+                    # map to our COLUMNS
+                    db = get_db()
+                    count=0
+                    for r in rows:
+                        # r is tuple, need dict
+                        d = dict(zip(cols, r))
+                        # skip id
+                        vals = [d.get(c,"") for c in COLUMNS]
+                        placeholders = ", ".join(["?"]*len(COLUMNS))
+                        cols_q = ", ".join([f'"{c}"' for c in COLUMNS])
+                        db.execute(f'INSERT INTO agents ({cols_q}) VALUES ({placeholders})', vals)
+                        count+=1
+                    db.commit()
+                    msg = f"Imported {count} agents from DB!"
+                except Exception as e:
+                    msg = f"Failed to read DB: {e}"
+                conn.close()
+            except Exception as e:
+                msg = f"Error: {e}"
+    content = f"""
+    <div class="card p-4 shadow-sm">
+        <h4>Import Agents from Agent.db</h4>
+        <p class="text-muted">I-upload mo yung original Agent.db mo galing phone/pc. I-click Add file.</p>
+        <p style="color:green"><b>{msg}</b></p>
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".db,.sqlite,.sqlite3" class="form-control mb-3" required>
+            <button class="btn btn-success">Import Now</button>
+            <a href="/" class="btn btn-secondary">Back to Home</a>
+        </form>
+        <hr>
+        <small>Tip: Kung wala yung Agent.db mo, pwede mo pa i-upload dito. Nasa Downloads mo pa ba yung original file?</small>
+    </div>
+    """
+    return render_page(content)
+
+# add link in navbar
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
