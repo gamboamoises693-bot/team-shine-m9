@@ -1,147 +1,85 @@
-
 import sqlite3
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, g
 
 app = Flask(__name__)
-app.secret_key = "team-shine-secret-2026"
-DB_PATH = os.path.join(os.path.dirname(__file__), "Agent.db")
+DATABASE = "Agent.db"
+
+COLUMNS = [
+    "NAME", "TENCENT ID", "PHONE NAME", "NBS ID",
+    "HEADSET SN", "IBAS", "DJANGO", "NT LOG IN",
+    "Sales Force", "ZOHO", "BSS WEB", "DATE HIRED",
+    "EMAIL", "BIRTHDAY", "ADDRESS", "CONTACT NO."
+]
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+    return db
 
 def init_db():
-    # ensure table exists (use cleaned structure)
-    conn = get_db()
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS agents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        NAME TEXT,
-        "TENCENT ID" TEXT,
-        "DATE HIRED" TEXT,
-        "PHONE NAME" TEXT,
-        "NBS ID" TEXT,
-        "HEADSET SN" TEXT,
-        IBAS TEXT,
-        DJANGO TEXT,
-        "NT LOG IN" TEXT,
-        "Sales Force" TEXT,
-        ZOHO TEXT,
-        "BSS WEB" TEXT,
-        EMAIL TEXT,
-        BIRTHDAY TEXT,
-        "CONTACT NO." TEXT,
-        ADDRESS TEXT
-    )
-    """)
-    conn.commit()
-    conn.close()
+    db = get_db()
+    cols_def = ", ".join([f'"{c}" TEXT' for c in COLUMNS])
+    db.execute(f'CREATE TABLE IF NOT EXISTS agents (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols_def})')
+    db.commit()
 
-init_db()
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
-    q = request.args.get("q","").strip()
-    conn = get_db()
+    init_db()
+    q = request.args.get("q", "").strip()
+    db = get_db()
     if q:
         like = f"%{q}%"
-        agents = conn.execute("""
-            SELECT * FROM agents 
-            WHERE NAME LIKE ? OR "TENCENT ID" LIKE ? OR "NBS ID" LIKE ? OR "PHONE NAME" LIKE ?
-            ORDER BY id DESC
-        """, (like,like,like,like)).fetchall()
+        where = " OR ".join([f'"{c}" LIKE ?' for c in COLUMNS])
+        params = [like]*len(COLUMNS)
+        cur = db.execute(f'SELECT * FROM agents WHERE {where} ORDER BY id DESC', params)
     else:
-        agents = conn.execute("SELECT * FROM agents ORDER BY id DESC").fetchall()
-    conn.close()
+        cur = db.execute('SELECT * FROM agents ORDER BY id DESC')
+    agents = cur.fetchall()
     return render_template("index.html", agents=agents, q=q)
 
-@app.route("/add", methods=["GET","POST"])
+@app.route("/add", methods=["GET", "POST"])
 def add():
+    init_db()
     if request.method == "POST":
-        data = (
-            request.form.get("NAME",""),
-            request.form.get("TENCENT ID",""),
-            request.form.get("DATE HIRED",""),
-            request.form.get("PHONE NAME",""),
-            request.form.get("NBS ID",""),
-            request.form.get("HEADSET SN",""),
-            request.form.get("IBAS",""),
-            request.form.get("DJANGO",""),
-            request.form.get("NT LOG IN",""),
-            request.form.get("Sales Force",""),
-            request.form.get("ZOHO",""),
-            request.form.get("BSS WEB",""),
-            request.form.get("EMAIL",""),
-            request.form.get("BIRTHDAY",""),
-            request.form.get("CONTACT NO.",""),
-            request.form.get("ADDRESS",""),
-        )
-        conn = get_db()
-        conn.execute("""
-            INSERT INTO agents (NAME, "TENCENT ID","DATE HIRED","PHONE NAME","NBS ID","HEADSET SN",IBAS,DJANGO,"NT LOG IN","Sales Force",ZOHO,"BSS WEB",EMAIL,BIRTHDAY,"CONTACT NO.",ADDRESS)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, data)
-        conn.commit()
-        conn.close()
-        flash("Agent added successfully!", "success")
+        db = get_db()
+        values = [request.form.get(c, "") for c in COLUMNS]
+        placeholders = ", ".join(["?"]*len(COLUMNS))
+        cols = ", ".join([f'"{c}"' for c in COLUMNS])
+        db.execute(f'INSERT INTO agents ({cols}) VALUES ({placeholders})', values)
+        db.commit()
         return redirect(url_for("index"))
-    return render_template("form.html", agent=None, title="Add Agent")
+    return render_template("form.html", title="Add Agent", agent=None)
 
-@app.route("/edit/<int:agent_id>", methods=["GET","POST"])
+@app.route("/edit/<int:agent_id>", methods=["GET", "POST"])
 def edit(agent_id):
-    conn = get_db()
-    agent = conn.execute("SELECT * FROM agents WHERE id=?", (agent_id,)).fetchone()
-    if not agent:
-        conn.close()
-        flash("Agent not found", "danger")
-        return redirect(url_for("index"))
+    init_db()
+    db = get_db()
     if request.method == "POST":
-        data = (
-            request.form.get("NAME",""),
-            request.form.get("TENCENT ID",""),
-            request.form.get("DATE HIRED",""),
-            request.form.get("PHONE NAME",""),
-            request.form.get("NBS ID",""),
-            request.form.get("HEADSET SN",""),
-            request.form.get("IBAS",""),
-            request.form.get("DJANGO",""),
-            request.form.get("NT LOG IN",""),
-            request.form.get("Sales Force",""),
-            request.form.get("ZOHO",""),
-            request.form.get("BSS WEB",""),
-            request.form.get("EMAIL",""),
-            request.form.get("BIRTHDAY",""),
-            request.form.get("CONTACT NO.",""),
-            request.form.get("ADDRESS",""),
-            agent_id
-        )
-        conn.execute("""
-            UPDATE agents SET NAME=?, "TENCENT ID"=?, "DATE HIRED"=?, "PHONE NAME"=?, "NBS ID"=?, "HEADSET SN"=?, IBAS=?, DJANGO=?, "NT LOG IN"=?, "Sales Force"=?, ZOHO=?, "BSS WEB"=?, EMAIL=?, BIRTHDAY=?, "CONTACT NO."=?, ADDRESS=? WHERE id=?
-        """, data)
-        conn.commit()
-        conn.close()
-        flash("Agent updated!", "success")
+        values = [request.form.get(c, "") for c in COLUMNS]
+        set_clause = ", ".join([f'"{c}"=?' for c in COLUMNS])
+        db.execute(f'UPDATE agents SET {set_clause} WHERE id=?', values + [agent_id])
+        db.commit()
         return redirect(url_for("index"))
-    conn.close()
-    return render_template("form.html", agent=agent, title="Edit Agent")
+    cur = db.execute('SELECT * FROM agents WHERE id=?', (agent_id,))
+    agent = cur.fetchone()
+    return render_template("form.html", title="Edit Agent", agent=agent)
 
 @app.route("/delete/<int:agent_id>", methods=["POST"])
 def delete(agent_id):
-    conn = get_db()
-    conn.execute("DELETE FROM agents WHERE id=?", (agent_id,))
-    conn.commit()
-    conn.close()
-    flash("Agent deleted", "warning")
+    init_db()
+    db = get_db()
+    db.execute('DELETE FROM agents WHERE id=?', (agent_id,))
+    db.commit()
     return redirect(url_for("index"))
-
-@app.route("/api/agents")
-def api_agents():
-    conn = get_db()
-    agents = conn.execute("SELECT * FROM agents").fetchall()
-    conn.close()
-    return jsonify([dict(a) for a in agents])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
