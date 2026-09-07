@@ -239,16 +239,157 @@ def ot_report():
     db=get_db()
     ot_map = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM ot_logs GROUP BY agent_id').fetchall()}
     loss_map = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM loss_logs GROUP BY agent_id').fetchall()}
+    ot_type_map = {}
+    for r in db.execute('SELECT agent_id, ot_type, SUM(hours) as t FROM ot_logs GROUP BY agent_id, ot_type').fetchall():
+        ot_type_map.setdefault(r['agent_id'], {})[r['ot_type']] = r['t']
     agents = db.execute('SELECT * FROM agents ORDER BY NAME').fetchall()
-    tr=""
+    
+    # Data for charts
+    labels = []
+    ot_data = []
+    loss_data = []
+    net_data = []
+    table_rows = ""
     for a in agents:
         ot = ot_map.get(a['id'],0) or 0
         loss = loss_map.get(a['id'],0) or 0
         if ot==0 and loss==0: continue
-        tr+=f"<tr><td>{a['id']}</td><td><a href='/view/{a['id']}' class='text-white fw-bold'>{a['NAME']}</a></td><td class='text-success fw-bold'>{ot:.1f}h</td><td class='text-danger fw-bold'>{loss:.1f}h</td><td class='text-warning fw-bold'>{ot-loss:+.1f}h</td></tr>"
-    g_ot = db.execute('SELECT SUM(hours) as t FROM ot_logs').fetchone()['t'] or 0
-    g_loss = db.execute('SELECT SUM(hours) as t FROM loss_logs').fetchone()['t'] or 0
-    content=f"<h4 class='fw-bold'>Team Report - OT vs LOSS</h4><div class='row g-2 mb-3'><div class='col-4'><div class='card p-3 text-center'><div class='field-label'>Total OT</div><div class='fs-3 fw-bold text-success'>{g_ot:.1f}h</div></div></div><div class='col-4'><div class='card p-3 text-center'><div class='field-label'>Total LOSS</div><div class='fs-3 fw-bold text-danger'>{g_loss:.1f}h</div></div></div><div class='col-4'><div class='card p-3 text-center' style='border:1px solid #fbbf24'><div class='field-label'>NET</div><div class='fs-3 fw-bold text-warning'>{g_ot-g_loss:+.1f}h</div></div></div></div><div class='card p-0 overflow-hidden'><table class='table mb-0'><thead><tr><th>ID</th><th>Agent</th><th>OT</th><th>LOSS</th><th>NET</th></tr></thead><tbody>{tr if tr else '<tr><td colspan=5 class=text-center>No records</td></tr>'}</tbody></table></div>"
+        labels.append(a['NAME'].split(',')[0])  # last name for chart
+        ot_data.append(round(ot,1))
+        loss_data.append(round(loss,1))
+        net_data.append(round(ot-loss,1))
+        table_rows+=f"<tr><td>{a['id']}</td><td><a href='/view/{a['id']}' class='text-white fw-bold'>{a['NAME']}</a><br><small style='color:#64748b'>{a['NBS ID'] or ''}</small></td><td class='text-success fw-bold'>{ot:.1f}h</td><td class='text-danger fw-bold'>{loss:.1f}h</td><td class='text-warning fw-bold'>{ot-loss:+.1f}h</td><td><span class='badge bg-dark'>{a['TENCENT ID'] or ''}</span></td></tr>"
+    
+    g_ot = db.execute('SELECT SUM(hours) as t, SUM(CASE WHEN ot_type="REGULAR" THEN hours ELSE 0 END) as reg, SUM(CASE WHEN ot_type="RDOT" THEN hours ELSE 0 END) as rdot FROM ot_logs').fetchone()
+    g_loss = db.execute('SELECT SUM(hours) as t FROM loss_logs').fetchone()
+    total_ot = g_ot['t'] or 0
+    reg_ot = g_ot['reg'] or 0
+    rdot_ot = g_ot['rdot'] or 0
+    total_loss = g_loss['t'] or 0
+    
+    # Sort for top charts
+    sorted_agents = sorted([(a['NAME'], ot_map.get(a['id'],0) or 0, loss_map.get(a['id'],0) or 0) for a in agents if (ot_map.get(a['id'],0) or 0)+(loss_map.get(a['id'],0) or 0)>0], key=lambda x: x[1], reverse=True)
+    top_ot_labels = [x[0].split(',')[0] for x in sorted_agents[:10]]
+    top_ot_vals = [x[1] for x in sorted_agents[:10]]
+    top_loss_sorted = sorted(sorted_agents, key=lambda x: x[2], reverse=True)
+    top_loss_labels = [x[0].split(',')[0] for x in top_loss_sorted[:10]]
+    top_loss_vals = [x[2] for x in top_loss_sorted[:10]]
+
+    import json
+    content=f"""
+    <div class='d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2'>
+        <h4 class='fw-bold text-white mb-0'><i class='bi bi-bar-chart-line text-warning'></i> Executive Reports - OT vs LOSS Analytics</h4>
+        <span class='badge bg-dark border'>Auto-updated • {len(labels)} active agents</span>
+    </div>
+    
+    <div class='row g-3 mb-4'>
+        <div class='col-md-3'><div class='card p-3 text-center' style='background:linear-gradient(135deg,#111827,#065f46);border:1px solid #065f46'><div class='field-label'>TOTAL OT RENDERED</div><div class='fs-1 fw-bold text-success'>{total_ot:.1f}h</div><div style='font-size:11px;color:#6ee7b7'>Regular {reg_ot:.1f}h • RDOT {rdot_ot:.1f}h</div></div></div>
+        <div class='col-md-3'><div class='card p-3 text-center' style='background:linear-gradient(135deg,#111827,#7f1d1d);border:1px solid #7f1d1d'><div class='field-label'>TOTAL LOSS HOURS</div><div class='fs-1 fw-bold text-danger'>{total_loss:.1f}h</div><div style='font-size:11px;color:#fca5a5'>Late, Undertime, Absent</div></div></div>
+        <div class='col-md-3'><div class='card p-3 text-center' style='border:1px solid #fbbf24'><div class='field-label'>NET HOURS</div><div class='fs-1 fw-bold text-warning'>{total_ot-total_loss:+.1f}h</div><div style='font-size:11px;color:#fde68a'>OT minus LOSS</div></div></div>
+        <div class='col-md-3'><div class='card p-3 text-center'><div class='field-label'>AVG PER AGENT</div><div class='fs-1 fw-bold text-white'>{(total_ot/len(labels) if labels else 0):.1f}h</div><div style='font-size:11px;color:#94a3b8'>OT average</div></div></div>
+    </div>
+
+    <div class='row g-3 mb-4'>
+        <div class='col-lg-8'>
+            <div class='card p-4'>
+                <h6 class='fw-bold mb-3'><i class='bi bi-graph-up text-success'></i> OT vs LOSS Comparison (All Agents)</h6>
+                <canvas id='otLossChart' height='120'></canvas>
+            </div>
+        </div>
+        <div class='col-lg-4'>
+            <div class='card p-4 h-100'>
+                <h6 class='fw-bold mb-3'><i class='bi bi-pie-chart text-warning'></i> Team OT Distribution</h6>
+                <canvas id='pieChart' height='200'></canvas>
+                <div class='mt-3 d-flex justify-content-around text-center'>
+                    <div><div class='field-label'>Regular OT</div><div class='fw-bold text-success'>{reg_ot:.1f}h</div></div>
+                    <div><div class='field-label'>RDOT</div><div class='fw-bold text-danger'>{rdot_ot:.1f}h</div></div>
+                    <div><div class='field-label'>LOSS</div><div class='fw-bold text-danger'>{total_loss:.1f}h</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class='row g-3 mb-4'>
+        <div class='col-md-6'><div class='card p-4'><h6 class='fw-bold mb-3 text-success'><i class='bi bi-trophy'></i> Top 10 Most OT (Hours)</h6><canvas id='topOtChart' height='120'></canvas></div></div>
+        <div class='col-md-6'><div class='card p-4'><h6 class='fw-bold mb-3 text-danger'><i class='bi bi-exclamation-triangle'></i> Top 10 Most LOSS Hours</h6><canvas id='topLossChart' height='120'></canvas></div></div>
+    </div>
+
+    <div class='card p-0 overflow-hidden'>
+        <div class='p-3 d-flex justify-content-between align-items-center'><h6 class='fw-bold mb-0'>Detailed Ranking - NET Hours</h6><span class='badge bg-warning text-dark'>OT - LOSS</span></div>
+        <div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th>ID</th><th>Agent</th><th>OT</th><th>LOSS</th><th>NET</th><th>Tencent</th></tr></thead><tbody>{table_rows if table_rows else '<tr><td colspan=6 class=text-center p-4>No records yet - mag-add ka ng OT/LOSS sa agents</td></tr>'}</tbody></table></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    const labels = {json.dumps(labels)};
+    const otData = {json.dumps(ot_data)};
+    const lossData = {json.dumps(loss_data)};
+    const netData = {json.dumps(net_data)};
+    
+    // Main OT vs LOSS chart
+    new Chart(document.getElementById('otLossChart'), {{
+        type: 'bar',
+        data: {{
+            labels: labels,
+            datasets: [
+                {{label: 'OT Hours', data: otData, backgroundColor: '#22c55e', borderRadius: 8}},
+                {{label: 'LOSS Hours', data: lossData, backgroundColor: '#ef4444', borderRadius: 8}}
+            ]
+        }},
+        options: {{
+            responsive: true,
+            plugins: {{legend: {{labels: {{color: '#94a3b8'}}}}}},
+            scales: {{
+                x: {{ticks: {{color: '#64748b', maxRotation: 45}}, grid: {{color: '#1f2937'}}}},
+                y: {{ticks: {{color: '#64748b'}}, grid: {{color: '#1f2937'}}}}
+            }}
+        }}
+    }});
+
+    // Pie chart
+    new Chart(document.getElementById('pieChart'), {{
+        type: 'doughnut',
+        data: {{
+            labels: ['Regular OT', 'RDOT', 'Loss Hours'],
+            datasets: [{{data: [{reg_ot}, {rdot_ot}, {total_loss}], backgroundColor: ['#22c55e','#f59e0b','#ef4444'], borderWidth: 0}}]
+        }},
+        options: {{
+            responsive: true,
+            plugins: {{legend: {{position: 'bottom', labels: {{color: '#e2e8f0', padding: 12}}}}}}
+        }}
+    }});
+
+    // Top OT
+    new Chart(document.getElementById('topOtChart'), {{
+        type: 'bar',
+        data: {{
+            labels: {json.dumps(top_ot_labels)},
+            datasets: [{{label: 'OT Hours', data: {json.dumps(top_ot_vals)}, backgroundColor: '#22c55e', borderRadius: 8}}]
+        }},
+        options: {{
+            indexAxis: 'y',
+            responsive: true,
+            plugins: {{legend: {{display: false}}}},
+            scales: {{x: {{ticks: {{color: '#64748b'}}, grid: {{color: '#1f2937'}} }}, y: {{ticks: {{color: '#e2e8f0'}}, grid: {{display: false}} }} }}
+        }}
+    }});
+
+    // Top Loss
+    new Chart(document.getElementById('topLossChart'), {{
+        type: 'bar',
+        data: {{
+            labels: {json.dumps(top_loss_labels)},
+            datasets: [{{label: 'Loss Hours', data: {json.dumps(top_loss_vals)}, backgroundColor: '#ef4444', borderRadius: 8}}]
+        }},
+        options: {{
+            indexAxis: 'y',
+            responsive: true,
+            plugins: {{legend: {{display: false}}}},
+            scales: {{x: {{ticks: {{color: '#64748b'}}, grid: {{color: '#1f2937'}} }}, y: {{ticks: {{color: '#e2e8f0'}}, grid: {{display: false}} }} }}
+        }}
+    }});
+    </script>
+    """
     cnt=db.execute('SELECT COUNT(*) FROM agents').fetchone()[0]
     return render_page(content, cnt)
 
