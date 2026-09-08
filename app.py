@@ -105,6 +105,48 @@ def calc(logs):
     loss=sum(float(l.get("hours",0)) for l in logs if l.get("type")=="LOSS")
     return normal,restday,normal+restday,loss,(normal+restday-loss)
 
+
+def get_csat(aid):
+    try:
+        logs = db_root.child("perf_logs").get() if db_root else {}
+        res=[]
+        if isinstance(logs, dict):
+            for lid,v in logs.items():
+                if not isinstance(v,dict): continue
+                if str(v.get("agent_id"))==str(aid) and v.get("type")=="CSAT":
+                    v["log_id"]=lid
+                    res.append(v)
+        return res
+    except:
+        return []
+
+def get_fcr(aid):
+    try:
+        logs = db_root.child("perf_logs").get() if db_root else {}
+        res=[]
+        if isinstance(logs, dict):
+            for lid,v in logs.items():
+                if not isinstance(v,dict): continue
+                if str(v.get("agent_id"))==str(aid) and v.get("type")=="FCR":
+                    v["log_id"]=lid
+                    res.append(v)
+        return res
+    except:
+        return []
+
+def calc_csat_fcr(logs):
+    try:
+        csat_list=[float(l.get("value",0)) for l in logs if l.get("type")=="CSAT"]
+        fcr_list=[float(l.get("value",0)) for l in logs if l.get("type")=="FCR"]
+        avg_csat = sum(csat_list)/len(csat_list) if csat_list else 0
+        avg_fcr = sum(fcr_list)/len(fcr_list) if fcr_list else 0
+        latest_csat = csat_list[-1] if csat_list else 0
+        latest_fcr = fcr_list[-1] if fcr_list else 0
+        return latest_csat, latest_fcr, avg_csat, avg_fcr
+    except:
+        return 0,0,0,0
+
+
 def calc_perf(logs):
     aht_list=[float(l.get("value",0)) for l in logs if l.get("type")=="AHT"]
     qa_list=[float(l.get("value",0)) for l in logs if l.get("type")=="QA"]
@@ -141,7 +183,7 @@ input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px sol
 <a href="/leaderboard" class="btn btn-sm btn-outline-warning">🏆</a>
 <a href="/export" class="btn btn-sm btn-outline-light">📥</a>
 <a href="/bulk" class="btn btn-sm btn-outline-light">📤</a>
-<a href="/working_hours" class="btn btn-sm btn-outline-light">⏱️ 220h</a> <a href="/bpo_benchmarks" class="btn btn-sm btn-outline-warning">📊 BPO</a> <a href="/burnout" class="btn btn-sm btn-outline-danger">🔥 Burnout</a> <a href="/weekly" class="btn btn-sm btn-outline-light">📅 Weekly</a> <a href="/logs" class="btn btn-sm btn-outline-light">📋</a> <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> <a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a> 
+<a href="/working_hours" class="btn btn-sm btn-outline-light">⏱️ 220h</a> <a href="/logs" class="btn btn-sm btn-outline-light">📋</a> <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> <a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a> 
 <a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
 </div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
@@ -605,7 +647,6 @@ def working_hours_monitoring():
     return page(html)
 
 
-
 @app.route("/bpo_benchmarks")
 @login_required
 def bpo_benchmarks():
@@ -804,6 +845,7 @@ def weekly_monitoring():
         rows+=row
     html+=f"<div class='card-dark mt-3'><h6 style='color:#fbbf24'>Per Agent - Last 4 Weeks OT</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>AGENT</th>{''.join([f'<th>W{w} - {y}</th>' for y,w in weeks])}</tr></thead><tbody>{rows}</tbody></table></div></div>"
     return page(html)
+
 
 @app.route("/leaderboard")
 @login_required
@@ -1102,6 +1144,12 @@ def view(aid):
     n,r,tot,loss,net=calc(logs)
     plogs=get_perf(aid)
     la,lq,aa,qa,_,_=calc_perf(plogs)
+    # CSAT FCR
+    all_perf = plogs  # perf_logs contains all types
+    csat_logs=[l for l in all_perf if l.get("type")=="CSAT"]
+    fcr_logs=[l for l in all_perf if l.get("type")=="FCR"]
+    l_csat,l_fcr,avg_csat,avg_fcr = calc_csat_fcr(all_perf)
+    
     from collections import defaultdict
     date_groups=defaultdict(list)
     for l in logs:
@@ -1123,78 +1171,207 @@ def view(aid):
         pgroups[l.get("date")].append(l)
     ind_aht=[]
     ind_qa=[]
+    ind_csat=[]
+    ind_fcr=[]
     for d in sorted_dates:
         pl=pgroups.get(d,[])
         _,_,aaa,qq,_,_=calc_perf(pl)
+        _,_,ac,af = calc_csat_fcr(pl)
         ind_aht.append(aaa)
         ind_qa.append(qq)
+        ind_csat.append(ac)
+        ind_fcr.append(af)
     log_rows=""
     for l in logs:
         col="#22c55e" if l.get("type")=="NORMAL_OT" else "#3b82f6" if l.get("type")=="RESTDAY_OT" else "#ef4444"
         log_rows+=f"<tr><td style='color:#cbd5e1'>{l.get('date','')}</td><td><span style='color:{col}'>{l.get('type')}</span></td><td style='color:white'>{l.get('hours')}h</td><td style='color:#94a3b8'>{l.get('reason','')}</td><td><a href='/delete_log/{aid}/{l.get('log_id','')}' class='btn btn-sm btn-outline-danger' style='font-size:10px'>X</a></td></tr>"
     if not log_rows:
-        log_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No logs yet</td></tr>"
+        log_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No OT/Loss logs</td></tr>"
     perf_rows=""
     for l in plogs:
-        col="#f97316" if l.get("type")=="AHT" else "#8b5cf6"
-        unit="m" if l.get("type")=="AHT" else "%"
-        perf_rows+=f"<tr><td style='color:#cbd5e1'>{l.get('date','')}</td><td><span style='color:{col}'>{l.get('type')}</span></td><td style='color:white'>{l.get('value')}{unit}</td><td style='color:#94a3b8'>{l.get('reason','')}</td><td><a href='/delete_perf/{aid}/{l.get('log_id','')}' class='btn btn-sm btn-outline-danger' style='font-size:10px'>X</a></td></tr>"
+        if l.get("type") in ["AHT","QA","CSAT","FCR"]:
+            col="#f97316" if l.get("type")=="AHT" else "#8b5cf6" if l.get("type")=="QA" else "#06b6d4" if l.get("type")=="CSAT" else "#f59e0b"
+            unit="m" if l.get("type")=="AHT" else "%" if l.get("type") in ["QA","CSAT","FCR"] else ""
+            perf_rows+=f"<tr><td style='color:#cbd5e1'>{l.get('date','')}</td><td><span style='color:{col}'>{l.get('type')}</span></td><td style='color:white'>{l.get('value')}{unit}</td><td style='color:#94a3b8'>{l.get('reason','')}</td><td><a href='/delete_perf/{aid}/{l.get('log_id','')}' class='btn btn-sm btn-outline-danger' style='font-size:10px'>X</a></td></tr>"
     if not perf_rows:
-        perf_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No AHT/QA logs</td></tr>"
+        perf_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No AHT/QA/CSAT/FCR logs</td></tr>"
     initial=str(data.get("NAME","?"))[:1]
     target=float(data.get("TARGET_OT",20))
+    wh_target=float(data.get("WORKING_HOURS_TARGET",220))
     pct = (tot/target*100) if target>0 else 0
+    wh_compliance = ((wh_target - loss)/wh_target*100) if wh_target>0 else 0
     bar_color = "#22c55e" if pct>=100 else "#fbbf24" if pct>=70 else "#ef4444"
+    wh_bar_color = "#22c55e" if wh_compliance>=95 else "#fbbf24" if wh_compliance>=90 else "#ef4444"
     is_agent = session.get("role")=="agent"
-    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back Dashboard</a><div class='card-dark' style='border:1px solid #334155'><div class='text-center'><div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div><h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')}</small><div class='mt-2'><small style='color:#94a3b8'>Target: {target}h | Progress: {round(pct,1)}%</small><div class='progress' style='height:8px;width:200px;margin:auto;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div></div></div>"
-    html+=f"<div class='row g-2 mt-3'><div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>{n}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>{r}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>{loss}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>{tot}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET</div><div class='val-big' style='color:#fbbf24'>+{net}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #f97316'><div class='label'>AHT</div><div class='val-big' style='color:#f97316'>{la}m</div><small style='color:#94a3b8;font-size:9px'>Avg:{round(aa,1)}m</small></div></div><div class='col-6'><div class='kpi' style='border:1px solid #8b5cf6'><div class='label'>QA SCORE</div><div class='val-big' style='color:#8b5cf6'>{lq}%</div><small style='color:#94a3b8;font-size:9px'>Avg:{round(qa,1)}%</small></div></div></div>"
+    # Attrition risk
+    risk_score=0
+    if tot>40: risk_score+=30
+    elif tot>30: risk_score+=15
+    if loss>8: risk_score+=30
+    elif loss>4: risk_score+=15
+    if lq>0 and lq<80: risk_score+=20
+    if la>10: risk_score+=20
+    risk = "Critical" if risk_score>=60 else "High" if risk_score>=40 else "Moderate" if risk_score>=20 else "Low"
+    risk_color="#22c55e" if risk=="Low" else "#fbbf24" if risk=="Moderate" else "#f97316" if risk=="High" else "#ef4444"
+    
+    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back Dashboard</a><div class='card-dark' style='border:1px solid #334155'><div class='text-center'><div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div><h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH Target: {wh_target}h</small><div class='mt-2'><small style='color:#94a3b8'>OT Target: {target}h | {round(pct,1)}% | WH Compliance: {round(wh_compliance,1)}% | Attrition Risk: <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div><small style='color:#94a3b8'>OT</small><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div></div><div><small style='color:#94a3b8'>WH</small><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_compliance)}%;background:{wh_bar_color}'></div></div></div></div></div></div>"
+    html+=f"<div class='row g-2 mt-3'><div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>{n}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>{r}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>{loss}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>{tot}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET OT</div><div class='val-big' style='color:#fbbf24'>+{net}h</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f97316;min-height:90px;height:90px'><div class='label'>AHT</div><div class='val-big' style='color:#f97316;font-size:18px'>{la}m</div><small style='color:#94a3b8;font-size:9px'>Avg {round(aa,1)}</small></div></div><div class='col-3'><div class='kpi' style='border:1px solid #8b5cf6;min-height:90px;height:90px'><div class='label'>QA</div><div class='val-big' style='color:#8b5cf6;font-size:18px'>{lq}%</div><small style='color:#94a3b8;font-size:9px'>Avg {round(qa,1)}</small></div></div><div class='col-3'><div class='kpi' style='border:1px solid #06b6d4;min-height:90px;height:90px'><div class='label'>CSAT</div><div class='val-big' style='color:#06b6d4;font-size:18px'>{l_csat}%</div><small style='color:#94a3b8;font-size:9px'>Avg {round(avg_csat,1)}</small></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f59e0b;min-height:90px;height:90px'><div class='label'>FCR</div><div class='val-big' style='color:#f59e0b;font-size:18px'>{l_fcr}%</div><small style='color:#94a3b8;font-size:9px'>Avg {round(avg_fcr,1)}</small></div></div></div>"
     html+=f"""
     <div class="row g-3 mt-4">
       <div class="col-12 col-md-6"><div class="chart-card"><h6 style="color:#fbbf24">Personal OT Trend (14 days)</h6><canvas id="indOT"></canvas></div></div>
-      <div class="col-12 col-md-6"><div class="chart-card"><h6 style="color:#8b5cf6">Personal QA & AHT Trend</h6><canvas id="indQA"></canvas></div></div>
+      <div class="col-12 col-md-6"><div class="chart-card"><h6 style="color:#8b5cf6">QA, AHT, CSAT, FCR Trend</h6><canvas id="indQA"></canvas></div></div>
     </div>
     <script>
     new Chart(document.getElementById('indOT'), {{type:'line', data:{{labels:{ind_labels}, datasets:[{{label:'Total OT', data:{ind_tot}, borderColor:'#fbbf24', backgroundColor:'#fbbf2433', fill:true, tension:0.4}},{{label:'Loss', data:{ind_loss}, borderColor:'#ef4444', fill:false}}] }}, options:{{responsive:true}} }});
-    new Chart(document.getElementById('indQA'), {{type:'line', data:{{labels:{ind_labels}, datasets:[{{label:'QA %', data:{ind_qa}, borderColor:'#8b5cf6', yAxisID:'y'}},{{label:'AHT m', data:{ind_aht}, borderColor:'#f97316', yAxisID:'y1'}}] }}, options:{{responsive:true, scales:{{y:{{type:'linear', position:'left'}}, y1:{{type:'linear', position:'right', grid:{{drawOnChartArea:false}}}}}} }} }});
+    new Chart(document.getElementById('indQA'), {{type:'line', data:{{labels:{ind_labels}, datasets:[{{label:'QA %', data:{ind_qa}, borderColor:'#8b5cf6'}},{{label:'CSAT %', data:{ind_csat}, borderColor:'#06b6d4'}},{{label:'FCR %', data:{ind_fcr}, borderColor:'#f59e0b'}},{{label:'AHT m', data:{ind_aht}, borderColor:'#f97316', yAxisID:'y1'}}] }}, options:{{responsive:true, scales:{{y:{{type:'linear', position:'left'}}, y1:{{type:'linear', position:'right', grid:{{drawOnChartArea:false}}}}}} }} }});
     </script>
     """
     html+=f"""
     <div class="card-dark mt-3" style="border:1px solid #334155">
-      <h6 style="color:#fbbf24">Target OT Setting</h6>
-      <form method="POST" action="/set_target/{aid}" class="row g-2">
-        <div class="col-6"><input name="target" type="number" step="0.5" class="form-control form-control-sm" value="{target}" placeholder="Target OT hours"></div>
-        <div class="col-6"><button class="btn btn-sm btn-warning w-100">Update Target</button></div>
-      </form>
+      <div class="row g-2">
+        <div class="col-6">
+          <h6 style="color:#fbbf24">Target OT Setting</h6>
+          <form method="POST" action="/set_target/{aid}" class="row g-2">
+            <div class="col-6"><input name="target" type="number" step="0.5" class="form-control form-control-sm" value="{target}" placeholder="Target OT"></div>
+            <div class="col-6"><button class="btn btn-sm btn-warning w-100">Update OT Target</button></div>
+          </form>
+        </div>
+        <div class="col-6">
+          <h6 style="color:#22c55e">Working Hours Target (220h)</h6>
+          <form method="POST" action="/set_working_hours/{aid}" class="row g-2">
+            <div class="col-6"><input name="working_hours_target" type="number" step="1" class="form-control form-control-sm" value="{wh_target}" placeholder="220"></div>
+            <div class="col-6"><button class="btn btn-sm btn-success w-100">Update WH Target</button></div>
+          </form>
+        </div>
+      </div>
     </div>
     """
     if session.get("role")=="admin":
-        current_pw = data.get("LOGIN_PASS") or data.get("TENCENT_ID") or "1234 (default = Tencent ID)"
+        current_pw = data.get("LOGIN_PASS") or data.get("TENCENT_ID") or "1234 (default)"
         html+=f"""
         <div class="card-dark mt-3" style="border:1px solid #ef4444">
-          <h6 style="color:#ef4444">Password Management - No current password needed</h6>
-          <p style="color:#94a3b8;font-size:11px">Current: <span style="color:#fbbf24">{current_pw}</span> | Username: {data.get("TENCENT_ID")}</p>
+          <h6 style="color:#ef4444">Password Management - No current needed</h6>
+          <p style="color:#94a3b8;font-size:11px">Current: <span style="color:#fbbf24">{current_pw}</span> | User: {data.get("TENCENT_ID")}</p>
           <form method="POST" action="/reset_password/{aid}" class="row g-2">
-            <div class="col-6"><input name="new_pass" type="text" class="form-control form-control-sm" placeholder="Leave blank = reset to Tencent ID"></div>
-            <div class="col-6"><button class="btn btn-sm btn-danger w-100">Reset / Set New Password</button></div>
+            <div class="col-6"><input name="new_pass" type="text" class="form-control form-control-sm" placeholder="Blank = reset to Tencent ID"></div>
+            <div class="col-6"><button class="btn btn-sm btn-danger w-100">Reset / Set Password</button></div>
           </form>
-          <small style="color:#64748b;font-size:10px">Admin can reset without knowing current. Blank = reset to Tencent ID.</small>
         </div>
         """
     elif is_agent and str(session.get("agent_id"))==str(aid):
         html+=f"""
         <div class="card-dark mt-3" style="border:1px solid #fbbf24">
-          <h6 style="color:#fbbf24">My Account - Change Password</h6>
-          <p style="color:#94a3b8;font-size:11px">Username: {data.get("TENCENT_ID")} | View only - you can change password</p>
-          <a href="/change_password" class="btn btn-sm btn-warning w-100">Change My Password</a>
+          <h6 style="color:#fbbf24">My Account</h6>
+          <p style="color:#94a3b8;font-size:11px">View only - Change password</p>
+          <a href="/change_password" class="btn btn-sm btn-warning w-100">Change Password</a>
         </div>
         """
     if not is_agent:
-        html+=f"<div class='row g-2 mt-4'><div class='col-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Add NORMAL OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='NORMAL_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#22c55e;color:white'>Add Normal OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Add RESTDAY OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='RESTDAY_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#3b82f6;color:white'>Add Restday OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f97316'><h6 style='color:#f97316'>Add AHT</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='AHT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='Minutes' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f97316;color:white'>Add AHT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>Add QA SCORE</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='QA'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='%' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='QA notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#8b5cf6;color:white'>Add QA</button></div></form></div></div><div class='col-12'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Add LOSS HOURS</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='LOSS'><div class='col-4'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Loss Hrs' required></div><div class='col-4'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-4'><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option></select></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#ef4444;color:white'>Add Loss</button></div></form></div></div></div>"
-        html+=f"<div class='mt-4'><h6 style='color:white'>OT & Loss History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>{log_rows}</tbody></table></div></div><div class='mt-3'><h6 style='color:white'>AHT & QA History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>{perf_rows}</tbody></table></div></div>"
+        html+=f"<div class='row g-2 mt-4'><div class='col-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Add NORMAL OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='NORMAL_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#22c55e;color:white'>Add Normal OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Add RESTDAY OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='RESTDAY_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#3b82f6;color:white'>Add Restday</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f97316'><h6 style='color:#f97316'>Add AHT</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='AHT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='Minutes' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f97316;color:white'>Add AHT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>Add QA</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='QA'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='%' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='QA notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#8b5cf6;color:white'>Add QA</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #06b6d4'><h6 style='color:#06b6d4'>Add CSAT - Customer Satisfaction</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='CSAT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='CSAT % (85 target)' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Customer feedback'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#06b6d4;color:white'>Add CSAT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f59e0b'><h6 style='color:#f59e0b'>Add FCR - First Contact Resolution</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='FCR'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='FCR % (70-75 target)' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='FCR notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f59e0b;color:white'>Add FCR</button></div></form></div></div><div class='col-12'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Add LOSS HOURS - Late/Absent</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='LOSS'><div class='col-4'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Loss Hrs' required></div><div class='col-4'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-4'><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option><option>Emergency</option></select></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason for loss'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#ef4444;color:white'>Add Loss</button></div></form></div></div></div>"
+        html+=f"<div class='mt-4'><h6 style='color:white'>OT & Loss History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>{log_rows}</tbody></table></div></div><div class='mt-3'><h6 style='color:white'>AHT, QA, CSAT, FCR History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>{perf_rows}</tbody></table></div></div>"
     else:
-        html+=f"<div class='card-dark mt-3'><h6 style='color:#94a3b8'>View Only - Agent Mode</h6><small style='color:#64748b'>Cards and graphs only. No data entry.</small></div>"
+        html+=f"<div class='card-dark mt-3'><h6 style='color:#94a3b8'>View Only - Agent Mode</h6><small style='color:#64748b'>Cards and graphs only. CSAT: {l_csat}%, FCR: {l_fcr}%, Attrition Risk: {risk}</small></div>"
     html+="</div>"
     return page(html)
 
+
+@app.route("/set_target/<aid>", methods=["POST"])
+@login_required
+def set_target(aid):
+    try:
+        target=request.form.get("target","20")
+        float_target = float(target)
+        if db_root:
+            db_root.child(f"agents/{aid}/TARGET_OT").set(str(float_target))
+    except Exception as e:
+        print(f"set_target error: {e}")
+    return redirect(f"/view/{aid}")
+
+@app.route("/set_working_hours/<aid>", methods=["POST"])
+@login_required
+def set_working_hours(aid):
+    try:
+        wh_target = request.form.get("working_hours_target","220")
+        float_target = float(wh_target)
+        if db_root:
+            db_root.child(f"agents/{aid}/WORKING_HOURS_TARGET").set(str(float_target))
+    except Exception as e:
+        print(f"set_working_hours error: {e}")
+    return redirect(f"/view/{aid}")
+
+@app.route("/add_ot/<aid>", methods=["POST"])
+@login_required
+def add_ot(aid):
+    if session.get("role")=="agent":
+        return redirect(f"/view/{aid}")
+    try:
+        typ=request.form.get("type","NORMAL_OT")
+        hours=request.form.get("hours","0")
+        date=request.form.get("date",datetime.now(PH_TZ).strftime("%Y-%m-%d"))
+        reason=request.form.get("reason","")
+        loss_type=request.form.get("loss_type","")
+        if loss_type:
+            reason = f"{loss_type} - {reason}" if reason else loss_type
+        if db_root:
+            db_root.child("ot_logs").push({"agent_id":str(aid),"type":typ,"hours":str(hours),"date":date,"reason":reason})
+    except Exception as e:
+        print(f"add_ot error: {e}")
+    return redirect(f"/view/{aid}")
+
+@app.route("/add_perf/<aid>", methods=["POST"])
+@login_required
+def add_perf(aid):
+    if session.get("role")=="agent":
+        return redirect(f"/view/{aid}")
+    try:
+        typ=request.form.get("type","AHT")
+        value=request.form.get("value","0")
+        date=request.form.get("date",datetime.now(PH_TZ).strftime("%Y-%m-%d"))
+        reason=request.form.get("reason","")
+        if db_root:
+            db_root.child("perf_logs").push({"agent_id":str(aid),"type":typ,"value":str(value),"date":date,"reason":reason})
+    except Exception as e:
+        print(f"add_perf error: {e}")
+    return redirect(f"/view/{aid}")
+
+@app.route("/delete_log/<aid>/<log_id>")
+@login_required
+def delete_log(aid, log_id):
+    if session.get("role")=="agent":
+        return redirect(f"/view/{aid}")
+    try:
+        if db_root: db_root.child("ot_logs/"+log_id).delete()
+    except: pass
+    return redirect(f"/view/{aid}")
+
+@app.route("/delete_perf/<aid>/<log_id>")
+@login_required
+def delete_perf(aid, log_id):
+    if session.get("role")=="agent":
+        return redirect(f"/view/{aid}")
+    try:
+        if db_root: db_root.child("perf_logs/"+log_id).delete()
+    except: pass
+    return redirect(f"/view/{aid}")
+
+@app.route("/reset_password/<aid>", methods=["POST"])
+@login_required
+def reset_password(aid):
+    if session.get("role")!="admin":
+        return redirect("/")
+    try:
+        new_pass=request.form.get("new_pass","").strip()
+        if not new_pass:
+            for a in get_all():
+                if str(a.get("id"))==str(aid):
+                    new_pass=str(a.get("TENCENT_ID"))
+                    break
+        if db_root and new_pass:
+            db_root.child(f"agents/{aid}/LOGIN_PASS").set(new_pass)
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": "admin","type": f"RESET_PASSWORD to {new_pass}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": aid})
+            except: pass
+    except: pass
+    return redirect(f"/view/{aid}")
 
 
