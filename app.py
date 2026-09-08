@@ -120,7 +120,7 @@ def view(aid):
     html+="<div class='col-4'><div class='kpi' style='border:1px solid #22c55e;box-shadow:0 0 10px rgba(34,197,94,0.15)'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(n)+"h</div></div></div>"
     html+="<div class='col-4'><div class='kpi' style='border:1px solid #3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.15)'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(r)+"h</div></div></div>"
     html+="<div class='col-4'><div class='kpi' style='border:1px solid #ef4444;box-shadow:0 0 10px rgba(239,68,68,0.15)'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(loss)+"h</div></div></div>"
-    html+="<div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT (N+RD)</div><div class='val-big' style='color:#22c55e'>"+str(tot)+"h</div><small style='color:#94a3b8'>N:"+str(n)+" + RD:"+str(r)+"</small></div></div>"
+    html+="<div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT (N+RD)</div><div class='val-big' style='color:#22c55e'>"+str(tot)+"h</div></div></div>"
     html+="<div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET (OT-LOSS)</div><div class='val-big' style='color:#fbbf24'>+"+str(net)+"h</div></div></div>"
     html+="</div>"
     # OT Input UI - 2 columns: Normal+Restday vs Loss
