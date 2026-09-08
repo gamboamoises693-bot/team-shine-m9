@@ -421,11 +421,11 @@ def dashboard():
     html+="<div class='row g-2 mt-3'>"
     html+=f"<div class='col-12'><h6 style='color:#fbbf24;margin:8px 0'>📊 TL Overall Team KPI - QA, AHT, ATTENDANCE (Main UI for TL)</h6></div>"
     html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #8b5cf6'><div class='label'>TEAM AVG QA</div><div class='val-big' style='color:#8b5cf6'>{round(avg_qa_team,1)}%</div><small style='color:var(--text2);font-size:10px'>{len(team_qa_vals)} agents</small></div></div>"
-    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #f97316'><div class='label'>TEAM AVG AHT</div><div class='val-big' style='color:#f97316'>{round(avg_aht_team,1)}m</div><small style='color:var(--text2);font-size:10px'>{len(team_aht_vals)} agents</small></div></div>"
-    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #22c55e'><div class='label'>TEAM ATTENDANCE</div><div class='val-big' style='color:#22c55e'>{round(overall_attendance,1)}%</div><small style='color:var(--text2);font-size:10px'>{round(total_actual,1)}/{total_wh_target}h</small></div></div>"
-    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #06b6d4'><div class='label'>TEAM AVG CSAT</div><div class='val-big' style='color:#06b6d4'>{round(avg_csat_team,1)}%</div><small style='color:var(--text2);font-size:10px'>{len(team_csat_vals)} agents</small></div></div>"
-    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #f59e0b'><div class='label'>TEAM AVG FCR</div><div class='val-big' style='color:#f59e0b'>{round(avg_fcr_team,1)}%</div><small style='color:var(--text2);font-size:10px'>{len(team_fcr_vals)} agents</small></div></div>"
-    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #22c55e'><div class='label'>WH COMP AVG</div><div class='val-big' style='color:#22c55e'>{round(avg_wh_comp_team,1)}%</div><small style='color:var(--text2);font-size:10px'>Overall</small></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #f97316'><div class='label'>TEAM AVG AHT</div><div class='val-big' style='color:#f97316'>{round(avg_aht_team,1)}m</div></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #22c55e'><div class='label'>TEAM ATTENDANCE</div><div class='val-big' style='color:#22c55e'>{round(overall_attendance,1)}%</div></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #06b6d4'><div class='label'>TEAM AVG CSAT</div><div class='val-big' style='color:#06b6d4'>{round(avg_csat_team,1)}%</div></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #f59e0b'><div class='label'>TEAM AVG FCR</div><div class='val-big' style='color:#f59e0b'>{round(avg_fcr_team,1)}%</div></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #22c55e'><div class='label'>WH COMP AVG</div><div class='val-big' style='color:#22c55e'>{round(avg_wh_comp_team,1)}%</div></div></div>"
     html+="</div>"
 
     # Top 3 Ranking UI - Enhanced ViewCard
@@ -499,28 +499,81 @@ def agents_list():
     if session.get("role")=="agent":
         return redirect(f"/view/{session.get('agent_id')}")
     q=request.args.get("q","").lower().strip()
+    edit_id=request.args.get("edit","")
     agents=get_all()
-    filtered=[a for a in agents if q in str(a.get("NAME","")).lower() or q in str(a.get("TENCENT_ID","")).lower()] if q else agents
+    filtered=[a for a in agents if q in str(a.get("NAME","")).lower() or q in str(a.get("TENCENT ID","")).lower() or q in str(a.get("TENCENT_ID","")).lower() or q in str(a.get("EMAIL","")).lower()] if q else agents
     rows=""
     for a in filtered:
         logs=get_ot(a.get("id"))
         n,r,tot,loss,net=calc(logs)
-        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:white'><b>{a.get('NAME','')}</b><br><small style='color:#94a3b8'>{a.get('TENCENT_ID')}</small></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent?')\">X</a></td></tr>"
+        t_id=a.get("TENCENT ID") or a.get("TENCENT_ID","")
+        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:var(--text);text-decoration:none'><b>{a.get('NAME','')}</b><br><small style='color:var(--text2)'>{t_id} | {a.get('EMAIL','')}</small></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/agents?edit={a.get('id')}&q={q}' class='btn btn-sm btn-primary'>Edit</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent {a.get('NAME','')}?')\">X</a></td></tr>"
     if not rows:
-        rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No agents</td></tr>"
+        rows="<tr><td colspan=5 style='text-align:center;color:var(--text2)'>No agents</td></tr>"
+    # Edit form if edit_id
+    edit_agent=None
+    if edit_id:
+        for a in agents:
+            if str(a.get("id"))==str(edit_id):
+                edit_agent=a
+                break
+    edit_form=""
+    if edit_agent:
+        edit_form=f"""
+        <div class='card-dark mt-3' style='border:2px solid #3b82f6'>
+          <h6 style='color:#3b82f6'>✏️ Edit Agent - {edit_agent.get('NAME','')} - All Fields</h6>
+          <form method='POST' action='/update_agent/{edit_agent.get('id')}' class='row g-2 mt-2'>
+            <div class='col-12 col-md-4'><label class='label'>NAME</label><input name='NAME' class='form-control form-control-sm' value='{edit_agent.get('NAME','')}' required></div>
+            <div class='col-6 col-md-2'><label class='label'>TENCENT ID</label><input name='TENCENT ID' class='form-control form-control-sm' value='{edit_agent.get('TENCENT ID','') or edit_agent.get('TENCENT_ID','')}' required></div>
+            <div class='col-6 col-md-2'><label class='label'>DATE HIRED</label><input name='DATE HIRED' type='date' class='form-control form-control-sm' value='{edit_agent.get('DATE HIRED','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>PHONE NAME</label><input name='PHONE NAME' class='form-control form-control-sm' value='{edit_agent.get('PHONE NAME','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>NBS ID</label><input name='NBS ID' class='form-control form-control-sm' value='{edit_agent.get('NBS ID','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>HEADSET SN</label><input name='HEADSET SN' class='form-control form-control-sm' value='{edit_agent.get('HEADSET SN','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>IBAS</label><input name='IBAS' class='form-control form-control-sm' value='{edit_agent.get('IBAS','')}'></div>
+            <div class='col-6 col-md-3'><label class='label'>DJANGO</label><input name='DJANGO' class='form-control form-control-sm' value='{edit_agent.get('DJANGO','')}'></div>
+            <div class='col-6 col-md-3'><label class='label'>NT LOG IN</label><input name='NT LOG IN' class='form-control form-control-sm' value='{edit_agent.get('NT LOG IN','')}'></div>
+            <div class='col-12 col-md-4'><label class='label'>Sales Force</label><input name='Sales Force' class='form-control form-control-sm' value='{edit_agent.get('Sales Force','')}'></div>
+            <div class='col-12 col-md-4'><label class='label'>ZOHO</label><input name='ZOHO' class='form-control form-control-sm' value='{edit_agent.get('ZOHO','')}'></div>
+            <div class='col-12 col-md-4'><label class='label'>BSS WEB</label><input name='BSS WEB' class='form-control form-control-sm' value='{edit_agent.get('BSS WEB','')}'></div>
+            <div class='col-12 col-md-4'><label class='label'>EMAIL</label><input name='EMAIL' type='email' class='form-control form-control-sm' value='{edit_agent.get('EMAIL','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>BIRTHDAY</label><input name='BIRTHDAY' type='date' class='form-control form-control-sm' value='{edit_agent.get('BIRTHDAY','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>CONTACT NO.</label><input name='CONTACT NO.' class='form-control form-control-sm' value='{edit_agent.get('CONTACT NO.','')}'></div>
+            <div class='col-12 col-md-4'><label class='label'>ADDRESS</label><input name='ADDRESS' class='form-control form-control-sm' value='{edit_agent.get('ADDRESS','')}'></div>
+            <div class='col-6 col-md-2'><label class='label'>TARGET_OT</label><input name='TARGET_OT' type='number' step='0.5' class='form-control form-control-sm' value='{edit_agent.get('TARGET_OT', edit_agent.get('TARGET OT','20'))}'></div>
+            <div class='col-6 col-md-2'><label class='label'>WORKING_HOURS_TARGET</label><input name='WORKING_HOURS_TARGET' type='number' class='form-control form-control-sm' value='{edit_agent.get('WORKING_HOURS_TARGET', edit_agent.get('WORKING HOURS TARGET','220'))}'></div>
+            <div class='col-6 col-md-2'><label class='label'>LOGIN_PASS</label><input name='LOGIN_PASS' class='form-control form-control-sm' value='{edit_agent.get('LOGIN_PASS','')}'></div>
+            <div class='col-12 d-flex gap-2 mt-2'><button class='btn btn-primary w-100'>💾 Update Agent</button><a href='/agents' class='btn btn-outline-light w-100'>Cancel</a></div>
+          </form>
+        </div>
+        """
     return page(f"""
-    <div class='d-flex justify-content-between flex-wrap gap-2'><h5 style='color:white'>All Agents ({len(filtered)}/{len(agents)}) - Add Agent UI</h5><div class='d-flex gap-2'><form method='GET' class='d-flex gap-2'><input name='q' value='{q}' class='form-control form-control-sm' placeholder='Search...' style='width:180px'><button class='btn btn-sm btn-warning'>Search</button></form><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div></div>
+    <div class='d-flex justify-content-between flex-wrap gap-2'><h5 style='color:var(--text)'>All Agents ({len(filtered)}/{len(agents)})</h5><div class='d-flex gap-2'><form method='GET' class='d-flex gap-2'><input name='q' value='{q}' class='form-control form-control-sm' placeholder='Search name, ID, email...' style='width:200px'><button class='btn btn-sm btn-warning'>Search</button></form><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div></div>
     <div class='card-dark mt-3' style='border:1px solid #22c55e'>
-      <h6 style='color:#22c55e'>➕ Add New Agent - DB Fields: NAME, TENCENT_ID, TARGET_OT, WORKING_HOURS_TARGET</h6>
-      <small style='color:#94a3b8'>Fields from Firebase: id (auto), NAME, TENCENT_ID, TARGET_OT (default 20), WORKING_HOURS_TARGET (default 220), LOGIN_PASS (default = TENCENT_ID)</small>
+      <h6 style='color:#22c55e'>➕ Add New Agent - Full Fields</h6>
       <form method='POST' action='/add_agent' class='row g-2 mt-2'>
-        <div class='col-6 col-md-3'><label class='label'>NAME (Last, First)</label><input name='name' class='form-control form-control-sm' placeholder='Ex: Dela Cruz, Juan' required></div>
-        <div class='col-6 col-md-2'><label class='label'>TENCENT_ID (4909)</label><input name='tencent_id' class='form-control form-control-sm' placeholder='Ex: 4909' required></div>
-        <div class='col-6 col-md-2'><label class='label'>TARGET_OT (20h)</label><input name='target_ot' type='number' step='0.5' class='form-control form-control-sm' value='20' required></div>
-        <div class='col-6 col-md-2'><label class='label'>WH_TARGET (220h)</label><input name='wh_target' type='number' step='1' class='form-control form-control-sm' value='220' required></div>
-        <div class='col-12 col-md-3 d-flex align-items-end'><button class='btn btn-success w-100'>➕ Add Agent</button></div>
+        <div class='col-12 col-md-4'><label class='label'>NAME *</label><input name='NAME' class='form-control form-control-sm' placeholder='Bernaldo, Catherine' required></div>
+        <div class='col-6 col-md-2'><label class='label'>TENCENT ID *</label><input name='TENCENT ID' class='form-control form-control-sm' placeholder='5116' required></div>
+        <div class='col-6 col-md-2'><label class='label'>DATE HIRED</label><input name='DATE HIRED' type='date' class='form-control form-control-sm'></div>
+        <div class='col-6 col-md-2'><label class='label'>PHONE NAME</label><input name='PHONE NAME' class='form-control form-control-sm' placeholder='HOPE'></div>
+        <div class='col-6 col-md-2'><label class='label'>NBS ID</label><input name='NBS ID' class='form-control form-control-sm' placeholder='10116'></div>
+        <div class='col-6 col-md-2'><label class='label'>HEADSET SN</label><input name='HEADSET SN' class='form-control form-control-sm' placeholder='2309410DUO286'></div>
+        <div class='col-6 col-md-2'><label class='label'>IBAS</label><input name='IBAS' class='form-control form-control-sm' placeholder='CATBERNA'></div>
+        <div class='col-6 col-md-3'><label class='label'>DJANGO</label><input name='DJANGO' class='form-control form-control-sm' placeholder='cabernaldo@uas2.com.ph'></div>
+        <div class='col-6 col-md-3'><label class='label'>NT LOG IN</label><input name='NT LOG IN' class='form-control form-control-sm' placeholder='UAS-Bernaldo.Catheri'></div>
+        <div class='col-12 col-md-4'><label class='label'>Sales Force</label><input name='Sales Force' class='form-control form-control-sm' placeholder='uas-bernaldo.cath@cict.com.ph'></div>
+        <div class='col-12 col-md-4'><label class='label'>ZOHO</label><input name='ZOHO' class='form-control form-control-sm' placeholder='c.bernaldo@uas2.com.ph'></div>
+        <div class='col-12 col-md-4'><label class='label'>BSS WEB</label><input name='BSS WEB' class='form-control form-control-sm' placeholder='uas-bernaldo.cath@partner...'></div>
+        <div class='col-12 col-md-4'><label class='label'>EMAIL</label><input name='EMAIL' type='email' class='form-control form-control-sm' placeholder='bernaldocatherine2@gmail.com'></div>
+        <div class='col-6 col-md-2'><label class='label'>BIRTHDAY</label><input name='BIRTHDAY' type='date' class='form-control form-control-sm'></div>
+        <div class='col-6 col-md-2'><label class='label'>CONTACT NO.</label><input name='CONTACT NO.' class='form-control form-control-sm' placeholder='09468168239'></div>
+        <div class='col-12 col-md-4'><label class='label'>ADDRESS</label><input name='ADDRESS' class='form-control form-control-sm' placeholder='15-C Feliza St. Angeles City'></div>
+        <div class='col-6 col-md-2'><label class='label'>TARGET_OT</label><input name='TARGET_OT' type='number' step='0.5' class='form-control form-control-sm' value='20'></div>
+        <div class='col-6 col-md-2'><label class='label'>WORKING_HOURS_TARGET</label><input name='WORKING_HOURS_TARGET' type='number' class='form-control form-control-sm' value='220'></div>
+        <div class='col-6 col-md-2'><label class='label'>LOGIN_PASS</label><input name='LOGIN_PASS' class='form-control form-control-sm' placeholder='Default TENCENT ID'></div>
+        <div class='col-12 mt-2'><button class='btn btn-success w-100'>➕ Add Agent - Full Fields</button></div>
       </form>
     </div>
+    {edit_form}
     <div class='card-dark mt-3'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>AGENT</th><th>TOTAL OT</th><th>LOSS</th><th>ACTION</th></tr></thead><tbody>{rows}</tbody></table></div></div>
     """)
 
@@ -530,13 +583,30 @@ def add_agent():
     if session.get("role")=="agent":
         return redirect("/")
     try:
-        name=request.form.get("name","").strip()
-        tencent_id=request.form.get("tencent_id","").strip()
-        target_ot=request.form.get("target_ot","20").strip()
-        wh_target=request.form.get("wh_target","220").strip()
-        if not name or not tencent_id:
+        # All fields from DB
+        fields = ["NAME","TENCENT ID","DATE HIRED","PHONE NAME","NBS ID","HEADSET SN","IBAS","DJANGO","NT LOG IN","Sales Force","ZOHO","BSS WEB","EMAIL","BIRTHDAY","CONTACT NO.","ADDRESS","TARGET_OT","WORKING_HOURS_TARGET","LOGIN_PASS"]
+        data={}
+        for f in fields:
+            val=request.form.get(f,"").strip()
+            if val:
+                data[f]=val
+        # Compatibility: also store TENCENT_ID underscore version
+        if "TENCENT ID" in data:
+            data["TENCENT_ID"]=data["TENCENT ID"]
+        if "TARGET_OT" in data:
+            data["TARGET_OT"]=data["TARGET_OT"]
+            data["TARGET OT"]=data["TARGET_OT"]
+        if "WORKING_HOURS_TARGET" in data:
+            data["WORKING_HOURS_TARGET"]=data["WORKING_HOURS_TARGET"]
+            data["WORKING HOURS TARGET"]=data["WORKING_HOURS_TARGET"]
+        if not data.get("NAME") or not (data.get("TENCENT ID") or data.get("TENCENT_ID")):
             return redirect("/agents")
-        # Generate new ID - find max ID
+        if not data.get("LOGIN_PASS"):
+            data["LOGIN_PASS"]=data.get("TENCENT ID") or data.get("TENCENT_ID") or "1234"
+        if not data.get("TARGET_OT"):
+            data["TARGET_OT"]="20"
+        if not data.get("WORKING_HOURS_TARGET"):
+            data["WORKING_HOURS_TARGET"]="220"
         agents=get_all()
         max_id=0
         for a in agents:
@@ -545,21 +615,62 @@ def add_agent():
             except:
                 pass
         new_id=str(max_id+1)
+        data["id"]=new_id
         if db_root:
-            db_root.child(f"agents/{new_id}").set({
-                "id": new_id,
-                "NAME": name,
-                "TENCENT_ID": tencent_id,
-                "TARGET_OT": str(target_ot),
-                "WORKING_HOURS_TARGET": str(wh_target),
-                "LOGIN_PASS": tencent_id
-            })
+            db_root.child(f"agents/{new_id}").set(data)
             try:
-                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": "admin","type": f"ADD_AGENT {name} ({tencent_id})","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": new_id})
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": "admin","type": f"ADD_AGENT {data.get('NAME')}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": new_id})
             except:
                 pass
     except Exception as e:
         print(f"add_agent error: {e}")
+        traceback.print_exc()
+    return redirect("/agents")
+
+@app.route("/update_agent/<aid>", methods=["POST"])
+@login_required
+def update_agent(aid):
+    if session.get("role")=="agent":
+        return redirect("/")
+    try:
+        fields = ["NAME","TENCENT ID","DATE HIRED","PHONE NAME","NBS ID","HEADSET SN","IBAS","DJANGO","NT LOG IN","Sales Force","ZOHO","BSS WEB","EMAIL","BIRTHDAY","CONTACT NO.","ADDRESS","TARGET_OT","WORKING_HOURS_TARGET","LOGIN_PASS"]
+        data={}
+        for f in fields:
+            val=request.form.get(f,"").strip()
+            data[f]=val
+        # Keep compatibility
+        if "TENCENT ID" in data and data["TENCENT ID"]:
+            data["TENCENT_ID"]=data["TENCENT ID"]
+        if "TARGET_OT" in data:
+            data["TARGET OT"]=data["TARGET_OT"]
+        if "WORKING_HOURS_TARGET" in data:
+            data["WORKING HOURS TARGET"]=data["WORKING_HOURS_TARGET"]
+        data["id"]=aid
+        # Remove empty fields? Keep all to update
+        # Get existing to preserve id
+        if db_root:
+            # Update existing agent
+            existing=db_root.child(f"agents/{aid}").get()
+            if existing:
+                # Merge
+                if isinstance(existing, dict):
+                    for k,v in data.items():
+                        if v!="":
+                            existing[k]=v
+                    # Ensure compatibility fields
+                    if existing.get("TENCENT ID"):
+                        existing["TENCENT_ID"]=existing["TENCENT ID"]
+                    db_root.child(f"agents/{aid}").set(existing)
+                else:
+                    db_root.child(f"agents/{aid}").set(data)
+            else:
+                db_root.child(f"agents/{aid}").set(data)
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": "admin","type": f"UPDATE_AGENT {data.get('NAME')}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": aid})
+            except:
+                pass
+    except Exception as e:
+        print(f"update_agent error: {e}")
         traceback.print_exc()
     return redirect("/agents")
 
@@ -996,9 +1107,9 @@ def export_page():
     return page("""
     <h5 style='color:var(--text)'>📊 Export - TL Team KPI - QA, AHT, ATTENDANCE + Excel + Light/Dark</h5>
     <div class='row g-3 mt-3'>
-      <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Export CSV - Overall Team KPI</h6><p style='color:var(--text2);font-size:12px'>CSV with QA, AHT, Attendance, OT, Loss, WH Compliance - TL Main UI</p><a href='/export/csv' class='btn btn-success w-100'>📥 Download CSV</a></div></div>
-      <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Export Excel - TL KPI QA AHT ATTENDANCE</h6><p style='color:var(--text2);font-size:12px'>Excel with 3 sheets: TL Summary, Agents Detail, Logs + Graphs data</p><a href='/export/excel' class='btn btn-primary w-100'>📊 Download Excel</a></div></div>
-      <div class='col-12'><div class='card-dark' style='border:1px solid #fbbf24'><h6 style='color:#fbbf24'>TL Overall Team KPI Summary - QA, AHT, ATTENDANCE Graphs</h6><p style='color:var(--text2);font-size:12px'>Includes: Team Avg QA, Team Avg AHT, Team Attendance %, WH Compliance, OT totals, Loss, Net + Monthly trend graphs</p><small style='color:var(--text2)'>Light/Dark Mode: Toggle 🌓 button sa navbar - saved sa browser</small></div></div>
+      <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Export CSV - Overall Team KPI</h6><a href='/export/csv' class='btn btn-success w-100'>📥 Download CSV</a></div></div>
+      <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Export Excel - TL KPI QA AHT ATTENDANCE</h6><a href='/export/excel' class='btn btn-primary w-100'>📊 Download Excel</a></div></div>
+      <div class='col-12'><div class='card-dark' style='border:1px solid #fbbf24'><h6 style='color:#fbbf24'>TL Overall Team KPI Summary - QA, AHT, ATTENDANCE Graphs</h6></div></div>
     </div>
     """)
 
