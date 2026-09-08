@@ -3,6 +3,22 @@ import os, json
 from flask import Flask, request, redirect
 from datetime import datetime
 app = Flask(__name__)
+
+app.secret_key = os.environ.get("SECRET_KEY", "team-shine-m9-secret-2024-!@#")
+TEAM_USER = os.environ.get("TEAM_USER", "admin")
+TEAM_PASS = os.environ.get("TEAM_PASS", "shine2024")
+
+from functools import wraps
+from flask import session
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated
+
 try:
     import firebase_admin
     from firebase_admin import credentials
@@ -18,6 +34,51 @@ try:
     db_root = db_mod.reference("team_shine_m9")
 except:
     db_root = None
+
+
+@app.route("/login", methods=["GET","POST"])
+def login():
+    error=""
+    if request.method=="POST":
+        u=request.form.get("username","")
+        p=request.form.get("password","")
+        if u==TEAM_USER and p==TEAM_PASS:
+            session["logged_in"]=True
+            session["user"]=u
+            return redirect("/")
+        else:
+            error="Invalid username or password!"
+    html = '''
+    <html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+    body{background:#0b1120;display:flex;align-items:center;justify-content:center;min-height:100vh;color:#f1f5f9}
+    .login-card{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:32px;max-width:400px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+    .logo{width:70px;height:70px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:900;color:#111827;margin:0 auto 16px}
+    input{background:#0f172a!important;color:#f1f5f9!important;border:1px solid #334155!important;border-radius:10px!important;padding:12px!important}
+    </style></head><body>
+    <div class="login-card text-center">
+        <div class="logo">S9</div>
+        <h4 style="color:white">TEAM SHINE M9</h4>
+        <small style="color:#94a3b8">Team Leader Login</small>
+        <form method="POST" class="mt-4 text-start">
+            <label style="font-size:11px;color:#94a3b8">USERNAME</label>
+            <input name="username" class="form-control mb-3" placeholder="admin" required>
+            <label style="font-size:11px;color:#94a3b8">PASSWORD</label>
+            <input name="password" type="password" class="form-control mb-3" placeholder="••••••••" required>
+            ''' + f"<div style='color:#ef4444;font-size:12px;margin-bottom:12px'>{error}</div>" + '''
+            <button class="btn btn-warning w-100" style="font-weight:700;padding:12px">Login to Dashboard</button>
+            <div class="mt-3 text-center"><small style="color:#64748b">Default: admin / shine2024<br>Change in Render Env: TEAM_USER & TEAM_PASS</small></div>
+        </form>
+    </div></body></html>
+    '''
+    return html
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
 
 def get_all():
     raw = db_root.child("agents").get()
@@ -75,13 +136,14 @@ input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px sol
 </style></head><body>
 <nav class="navbar p-3" style="background:#0f172a;border-bottom:1px solid #1e293b"><div class="container-fluid">
 <a class="navbar-brand fw-bold text-light" href="/">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px"><i class="bi bi-graph-up-arrow"></i> TEAM LEADER DASHBOARD</small></a>
-<div><span class="badge bg-warning text-dark">19 AGENTS LIVE</span> <a href="/agents" class="btn btn-sm btn-outline-light ms-2">Agents List</a></div>
+<div><span class="badge bg-warning text-dark">19 AGENTS LIVE</span> <a href="/agents" class="btn btn-sm btn-outline-light ms-2">Agents List</a> <a href="/logout" class="btn btn-sm btn-outline-danger ms-1">Logout</a></div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">__CONTENT__</div></body></html>"""
 
 def page(c):
     return BASE.replace("__CONTENT__", c)
 
 @app.route("/")
+@login_required
 def dashboard():
     agents=get_all()
     team_normal=0
@@ -153,6 +215,7 @@ def dashboard():
     return page(html)
 
 @app.route("/agents")
+@login_required
 def agents_list():
     agents=get_all()
     rows=""
@@ -163,6 +226,7 @@ def agents_list():
     return page("<div class='d-flex justify-content-between'><h5 style='color:white'>All Agents ("+str(len(agents))+")</h5><a href='/' class='btn btn-sm btn-outline-light'>Back to Team Dashboard</a></div><div class='card-dark mt-3'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>AGENT</th><th>N OT</th><th>RD OT</th><th>LOSS</th><th></th></tr></thead><tbody>"+rows+"</tbody></table></div></div>")
 
 @app.route("/view/<aid>")
+@login_required
 def view(aid):
     data=None
     for a in get_all():
@@ -199,6 +263,7 @@ def view(aid):
     return page(html)
 
 @app.route("/add_ot/<aid>", methods=["POST"])
+@login_required
 def add_ot(aid):
     typ=request.form.get("type","NORMAL_OT")
     hours=request.form.get("hours","0")
@@ -208,6 +273,7 @@ def add_ot(aid):
     return redirect("/view/"+str(aid))
 
 @app.route("/delete_log/<aid>/<log_id>")
+@login_required
 def delete_log(aid, log_id):
     db_root.child("ot_logs/"+log_id).delete()
     return redirect("/view/"+str(aid))
