@@ -63,13 +63,16 @@ def login():
         <small style="color:#94a3b8">Team Leader Login</small>
         <form method="POST" class="mt-4 text-start">
             <label style="font-size:11px;color:#94a3b8">USERNAME</label>
-            <input name="username" class="form-control mb-3" placeholder="admin" required>
+            <input name="username" class="form-control mb-3" placeholder="Enter username" required>
             <label style="font-size:11px;color:#94a3b8">PASSWORD</label>
-            <input name="password" type="password" class="form-control mb-3" placeholder="••••••••" required>
+            <input name="password" type="password" class="form-control mb-3" placeholder="Enter password" required>
             ''' + f"<div style='color:#ef4444;font-size:12px;margin-bottom:12px'>{error}</div>" + '''
             <button class="btn btn-warning w-100" style="font-weight:700;padding:12px">Login to Dashboard</button>
-            <div class="mt-3 text-center"><small style="color:#64748b">Default: admin / shine2024<br>Change in Render Env: TEAM_USER & TEAM_PASS</small></div>
+            <div class="mt-3 text-center"><small style="color:#64748b">Secure Team Access<br>Developed By: Moises Gamboa | Computer Engineer</small></div>
         </form>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1e293b;text-align:center">
+            <small style="color:#94a3b8">Developed By : <span style="color:#fbbf24">Moises Gamboa</span> | Computer Engineer</small>
+        </div>
     </div></body></html>
     '''
     return html
@@ -137,7 +140,11 @@ input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px sol
 <nav class="navbar p-3" style="background:#0f172a;border-bottom:1px solid #1e293b"><div class="container-fluid">
 <a class="navbar-brand fw-bold text-light" href="/">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px"><i class="bi bi-graph-up-arrow"></i> TEAM LEADER DASHBOARD</small></a>
 <div><span class="badge bg-warning text-dark">19 AGENTS LIVE</span> <a href="/agents" class="btn btn-sm btn-outline-light ms-2">Agents List</a> <a href="/logout" class="btn btn-sm btn-outline-danger ms-1">Logout</a></div>
-</div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">__CONTENT__</div></body></html>"""
+</div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">__CONTENT__</div>
+<footer style="text-align:center;padding:20px;color:#64748b;font-size:12px;border-top:1px solid #1e293b;margin-top:30px">
+  <div>Developed By : <span style="color:#fbbf24;font-weight:600">Moises Gamboa</span> | Computer Engineer</div>
+  <div style="font-size:10px;margin-top:4px">TEAM SHINE M9 - OT + LOSS Monitoring System</div>
+</footer></body></html>"""
 
 def page(c):
     return BASE.replace("__CONTENT__", c)
