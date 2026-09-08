@@ -43,7 +43,6 @@ def get_ot(agent_id):
         for lid, v in logs.items():
             if not isinstance(v, dict): continue
             if str(v.get("agent_id"))==str(agent_id):
-                v["log_id"]=lid
                 result.append(v)
     return result
 
@@ -53,46 +52,115 @@ def calc(logs):
     loss=sum(float(l.get("hours",0)) for l in logs if l.get("type")=="LOSS")
     return normal,restday,normal+restday,loss,(normal+restday-loss)
 
-BASE1 = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+BASE = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-body{background:#0b1120;color:#f1f5f9}
-.card-dark{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
-.kpi{padding:14px;border-radius:14px;background:#151e32;border:1px solid #1e293b;text-align:center}
-.label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
-.val{color:#ffffff;font-weight:700}
-.val-big{font-size:26px;font-weight:800}
-.avatar{width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto}
-.table thead th{background:#0f172a!important;color:#fbbf24!important;font-size:11px}
-.table tbody td{background:#151e32!important;border-color:#1e293b!important;color:#e2e8f0!important}
+body{background:#0b1120;color:#f1f5f9;font-family:Inter,system-ui}
+.card-dark{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.kpi{padding:16px;border-radius:16px;background:#151e32;border:1px solid #2d3748;text-align:center;transition:all 0.2s}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.4)}
+.label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.val-big{font-size:26px;font-weight:800;margin-top:4px}
+.val{color:#fff;font-weight:600}
+.avatar{width:44px;height:44px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#111827}
+.table thead th{background:#0f172a!important;color:#fbbf24!important;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border:none!important}
+.table tbody td{background:#151e32!important;border-color:#1e293b!important;color:#e2e8f0!important;padding:12px 8px}
+.badge-critical{background:#ef4444;color:white;border-radius:6px;padding:2px 8px;font-size:10px}
+.badge-warning{background:#f59e0b;color:#111827;border-radius:6px;padding:2px 8px;font-size:10px}
+.badge-good{background:#22c55e;color:white;border-radius:6px;padding:2px 8px;font-size:10px}
+.progress{height:8px;background:#0f172a;border-radius:10px}
+.progress-bar{border-radius:10px}
 input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px solid #334155!important}
-.card-ot{border:1px solid #22c55e!important;background:linear-gradient(135deg,#151e32,#0f172a)}
-.card-rdot{border:1px solid #3b82f6!important;background:linear-gradient(135deg,#151e32,#0f172a)}
-.card-loss{border:1px solid #ef4444!important;background:linear-gradient(135deg,#151e32,#1a1010)}
-.btn-ot{background:#22c55e;color:white;font-weight:700;border:none}
-.btn-rdot{background:#3b82f6;color:white;font-weight:700;border:none}
-.btn-loss{background:#ef4444;color:white;font-weight:700;border:none}
 </style></head><body>
 <nav class="navbar p-3" style="background:#0f172a;border-bottom:1px solid #1e293b"><div class="container-fluid">
-<a class="navbar-brand fw-bold text-light" href="/">TEAM SHINE M9 <small style="color:#94a3b8;font-size:10px">NORMAL + RD OT + LOSS</small></a>
-<div><span class="badge bg-warning text-dark">19 AGENTS</span> <a href="/" class="btn btn-sm btn-outline-light ms-2">Agents</a></div>
-</div></nav><div class="container-fluid p-3" style="max-width:1000px;margin:auto">"""
-
-BASE2 = "</div></body></html>"
+<a class="navbar-brand fw-bold text-light" href="/">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px"><i class="bi bi-graph-up-arrow"></i> TEAM LEADER DASHBOARD</small></a>
+<div><span class="badge bg-warning text-dark">19 AGENTS LIVE</span> <a href="/agents" class="btn btn-sm btn-outline-light ms-2">Agents List</a></div>
+</div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">__CONTENT__</div></body></html>"""
 
 def page(c):
-    return BASE1 + c + BASE2
+    return BASE.replace("__CONTENT__", c)
 
 @app.route("/")
-def home():
+def dashboard():
+    agents=get_all()
+    team_normal=0
+    team_restday=0
+    team_loss=0
+    team_total=0
+    team_net=0
+    agent_stats=[]
+    for a in agents:
+        logs=get_ot(a.get("id"))
+        n,r,tot,loss,net=calc(logs)
+        team_normal+=n
+        team_restday+=r
+        team_loss+=loss
+        team_total+=tot
+        team_net+=net
+        agent_stats.append({"id":a.get("id"),"name":a.get("NAME","No Name"),"tid":a.get("TENCENT_ID",""),"n":n,"r":r,"tot":tot,"loss":loss,"net":net})
+    agent_stats_sorted=sorted(agent_stats, key=lambda x: x["tot"], reverse=True)
+    top_performers=agent_stats_sorted[:5]
+    critical_loss=sorted([x for x in agent_stats if x["loss"]>0], key=lambda x: x["loss"], reverse=True)[:5]
+    avg_ot=team_total/len(agents) if agents else 0
+    avg_net=team_net/len(agents) if agents else 0
+
+    # KPI Cards
+    html="<div class='d-flex justify-content-between align-items-center mb-3'><h5 style='color:white'><i class='bi bi-speedometer2' style='color:#fbbf24'></i> Team Performance Overview</h5><small style='color:#94a3b8'>Last update: "+datetime.now().strftime("%b %d, %Y %I:%M %p")+"</small></div>"
+    html+="<div class='row g-3'>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TEAM NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(round(team_normal,1))+"h</div><small style='color:#94a3b8'>"+str(round(team_normal/len(agents),1))+" avg</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>TEAM RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(round(team_restday,1))+"h</div><small style='color:#94a3b8'>"+str(round(team_restday/len(agents),1))+" avg</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>TEAM TOTAL OT</div><div class='val-big' style='color:#fbbf24'>"+str(round(team_total,1))+"h</div><small style='color:#22c55e'>N:"+str(round(team_normal,1))+" RD:"+str(round(team_restday,1))+"</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>TEAM LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(round(team_loss,1))+"h</div><small style='color:#ef4444'>Critical KPI</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #a855f7'><div class='label'>TEAM NET (OT-LOSS)</div><div class='val-big' style='color:#a855f7'>+"+str(round(team_net,1))+"h</div><small style='color:#94a3b8'>"+str(round(avg_net,1))+" avg/agent</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #06b6d4'><div class='label'>AVG OT / AGENT</div><div class='val-big' style='color:#06b6d4'>"+str(round(avg_ot,1))+"h</div><small style='color:#94a3b8'>19 agents</small></div></div>"
+    html+="</div>"
+
+    # Critical KPIs Row
+    html+="<div class='row g-3 mt-3'>"
+    # Top Performers
+    html+="<div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'><i class='bi bi-trophy-fill'></i> TOP PERFORMERS - Highest OT</h6>"
+    for idx, a in enumerate(top_performers):
+        pct = int((a['tot']/max(1,agent_stats_sorted[0]['tot']))*100)
+        html+="<div class='d-flex justify-content-between align-items-center mt-3'><div class='d-flex align-items-center'><div class='avatar' style='width:36px;height:36px;font-size:14px'>"+str(a['name'][:1])+"</div><div class='ms-2'><div style='color:white;font-size:13px;font-weight:600'>"+str(a['name'])+"</div><small style='color:#94a3b8'>"+str(a['tid'])+" • N:"+str(a['n'])+" RD:"+str(a['r'])+"</small></div></div><div class='text-end'><div style='color:#22c55e;font-weight:800'>"+str(a['tot'])+"h</div><div class='progress' style='width:60px'><div class='progress-bar' style='width:"+str(pct)+"%;background:#22c55e'></div></div></div></div>"
+    html+="</div></div>"
+    # Critical Loss
+    html+="<div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'><i class='bi bi-exclamation-triangle-fill'></i> CRITICAL - Loss Hours Monitoring</h6>"
+    if not critical_loss:
+        html+="<div class='text-center py-4'><i class='bi bi-check-circle' style='font-size:32px;color:#22c55e'></i><div style='color:#94a3b8' class='mt-2'>No Loss Hours - Team is Good! 🎉</div></div>"
+    else:
+        for a in critical_loss:
+            status="badge-critical" if a['loss']>=4 else "badge-warning"
+            html+="<div class='d-flex justify-content-between align-items-center mt-3'><div class='d-flex align-items-center'><div class='avatar' style='width:36px;height:36px;background:#ef4444;color:white;font-size:14px'>!</div><div class='ms-2'><div style='color:white;font-size:13px'>"+str(a['name'])+"</div><small style='color:#94a3b8'>"+str(a['tid'])+"</small></div></div><div class='text-end'><span class='"+status+"'>"+str(a['loss'])+"h LOSS</span><div style='color:#94a3b8;font-size:11px'>Net: "+str(a['net'])+"h</div></div></div>"
+    html+="</div></div>"
+    html+="</div>"
+
+    # Team Performance Table
+    html+="<div class='card-dark mt-3' style='border:1px solid #334155'><div class='d-flex justify-content-between align-items-center'><h6 style='color:white'><i class='bi bi-people-fill' style='color:#fbbf24'></i> Full Team Performance - Critical KPIs</h6><a href='/agents' class='btn btn-sm btn-warning'>View All 19 Agents</a></div>"
+    html+="<div class='table-responsive mt-3'><table class='table table-sm'><thead><tr><th>Agent</th><th>Normal</th><th>Restday</th><th>Total OT</th><th>Loss</th><th>NET</th><th>Status</th></tr></thead><tbody>"
+    for a in agent_stats_sorted:
+        if a['loss']>=4:
+            st="<span class='badge-critical'>Critical</span>"
+        elif a['loss']>0:
+            st="<span class='badge-warning'>Warning</span>"
+        elif a['tot']>=10:
+            st="<span class='badge-good'>Top</span>"
+        else:
+            st="<span style='color:#94a3b8;font-size:10px'>Normal</span>"
+        html+="<tr><td><a href='/view/"+str(a['id'])+"' style='color:white;text-decoration:none'><b style='font-size:13px'>"+str(a['name'])+"</b><br><small style='color:#94a3b8'>"+str(a['tid'])+"</small></a></td><td style='color:#22c55e'>"+str(a['n'])+"h</td><td style='color:#3b82f6'>"+str(a['r'])+"h</td><td style='color:#fbbf24;font-weight:700'>"+str(a['tot'])+"h</td><td style='color:#ef4444'>"+str(a['loss'])+"h</td><td style='color:#a855f7;font-weight:700'>+"+str(a['net'])+"h</td><td>"+st+"</td></tr>"
+    html+="</tbody></table></div></div>"
+
+    return page(html)
+
+@app.route("/agents")
+def agents_list():
     agents=get_all()
     rows=""
     for a in agents:
         logs=get_ot(a.get("id"))
         n,r,tot,loss,net=calc(logs)
-        rows+="<tr><td>"+str(a.get("id"))+"</td><td><a href='/view/"+str(a.get("id"))+"' style='color:white;text-decoration:none'><b>"+str(a.get("NAME",""))+"</b><br><small style='color:#94a3b8'>"+str(a.get("TENCENT_ID",""))+" | N:"+str(n)+" R:"+str(r)+" L:"+str(loss)+" NET:"+str(net)+"</small></a></td><td><a href='/view/"+str(a.get("id"))+"' class='btn btn-sm btn-warning'>View</a></td></tr>"
-    return page("<h5 style='color:white'>All Agents ("+str(len(agents))+") - OT Monitoring</h5><div class='card-dark mt-3'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>AGENT - N:Normal R:Restday L:Loss</th><th></th></tr></thead><tbody>"+rows+"</tbody></table></div></div>")
+        rows+="<tr><td>"+str(a.get("id"))+"</td><td><a href='/view/"+str(a.get("id"))+"' style='color:white;text-decoration:none'><b>"+str(a.get("NAME",""))+"</b><br><small style='color:#94a3b8'>"+str(a.get("TENCENT_ID",""))+" | NET:"+str(net)+"h</small></a></td><td style='color:#22c55e'>"+str(n)+"h</td><td style='color:#3b82f6'>"+str(r)+"h</td><td style='color:#ef4444'>"+str(loss)+"h</td><td><a href='/view/"+str(a.get("id"))+"' class='btn btn-sm btn-warning'>View</a></td></tr>"
+    return page("<div class='d-flex justify-content-between'><h5 style='color:white'>All Agents ("+str(len(agents))+")</h5><a href='/' class='btn btn-sm btn-outline-light'>Back to Team Dashboard</a></div><div class='card-dark mt-3'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>AGENT</th><th>N OT</th><th>RD OT</th><th>LOSS</th><th></th></tr></thead><tbody>"+rows+"</tbody></table></div></div>")
 
 @app.route("/view/<aid>")
 def view(aid):
@@ -106,63 +174,27 @@ def view(aid):
     logs=get_ot(aid)
     n,r,tot,loss,net=calc(logs)
     log_rows=""
-    for l in sorted(logs, key=lambda x: x.get("date",""), reverse=True):
+    for l in logs:
         col="#22c55e" if l.get("type")=="NORMAL_OT" else "#3b82f6" if l.get("type")=="RESTDAY_OT" else "#ef4444"
-        icon="bi-sun" if l.get("type")=="NORMAL_OT" else "bi-moon-stars" if l.get("type")=="RESTDAY_OT" else "bi-exclamation-triangle"
-        log_rows+="<tr><td style='color:#cbd5e1'>"+str(l.get("date",""))+"</td><td><i class='bi "+icon+"' style='color:"+col+"'></i> <span style='color:"+col+";font-weight:700'>"+str(l.get("type")).replace("_"," ")+"</span></td><td style='color:white;font-weight:700'>"+str(l.get("hours"))+"h</td><td style='color:#94a3b8'>"+str(l.get("reason",""))+"</td><td><a href='/delete_log/"+str(aid)+"/"+str(l.get("log_id"))+"' class='btn btn-sm btn-outline-danger' style='font-size:10px'>X</a></td></tr>"
+        log_rows+="<tr><td style='color:#cbd5e1'>"+str(l.get("date",""))+"</td><td><span style='color:"+col+"'>"+str(l.get("type"))+"</span></td><td style='color:white'>"+str(l.get("hours"))+"h</td><td style='color:#94a3b8'>"+str(l.get("reason",""))+"</td><td><a href='/delete_log/"+str(aid)+"/"+str(l.get("log_id",''))+"' class='btn btn-sm btn-outline-danger' style='font-size:10px'>X</a></td></tr>"
     if not log_rows:
-        log_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No logs yet - add OT or Loss below</td></tr>"
+        log_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No logs yet</td></tr>"
     initial=str(data.get("NAME","?"))[:1]
-    html="<a href='/' class='btn btn-sm btn-outline-light mb-3'><i class='bi bi-arrow-left'></i> Back Dashboard</a>"
-    html+="<div class='card-dark' style='border:1px solid #334155'>"
-    html+="<div class='text-center'><div class='avatar'>"+initial+"</div><h4 style='color:white;margin-top:12px'>"+str(data.get("NAME",""))+"</h4><small style='color:#94a3b8'>"+str(data.get("TENCENT_ID",""))+" • ID:"+str(aid)+"</small></div>"
+    html="<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back to Team Dashboard</a>"
+    html+="<div class='card-dark' style='border:1px solid #334155'><div class='text-center'><div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>"+initial+"</div><h4 style='color:white;margin-top:12px'>"+str(data.get("NAME",""))+"</h4><small style='color:#94a3b8'>"+str(data.get("TENCENT_ID",""))+"</small></div>"
     html+="<div class='row g-2 mt-3'>"
-    html+="<div class='col-4'><div class='kpi' style='border:1px solid #22c55e;box-shadow:0 0 10px rgba(34,197,94,0.15)'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(n)+"h</div></div></div>"
-    html+="<div class='col-4'><div class='kpi' style='border:1px solid #3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.15)'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(r)+"h</div></div></div>"
-    html+="<div class='col-4'><div class='kpi' style='border:1px solid #ef4444;box-shadow:0 0 10px rgba(239,68,68,0.15)'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(loss)+"h</div></div></div>"
-    html+="<div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT (N+RD)</div><div class='val-big' style='color:#22c55e'>"+str(tot)+"h</div></div></div>"
-    html+="<div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET (OT-LOSS)</div><div class='val-big' style='color:#fbbf24'>+"+str(net)+"h</div></div></div>"
+    html+="<div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(n)+"h</div></div></div>"
+    html+="<div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(r)+"h</div></div></div>"
+    html+="<div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(loss)+"h</div></div></div>"
+    html+="<div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>"+str(tot)+"h</div></div></div>"
+    html+="<div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET</div><div class='val-big' style='color:#fbbf24'>+"+str(net)+"h</div></div></div>"
     html+="</div>"
-    # OT Input UI - 2 columns: Normal+Restday vs Loss
-    html+="<div class='row g-3 mt-4'>"
-    # Normal OT Card
-    html+="<div class='col-12 col-md-6'><div class='card-dark card-ot'>"
-    html+="<h6 style='color:#22c55e'><i class='bi bi-sun-fill'></i> Add NORMAL OT</h6>"
-    html+="<form method='POST' action='/add_ot/"+str(aid)+"' class='row g-2 mt-1'>"
-    html+="<input type='hidden' name='type' value='NORMAL_OT'>"
-    html+="<div class='col-5'><label class='label'>Hours</label><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='2.5' required></div>"
-    html+="<div class='col-7'><label class='label'>Date</label><input name='date' type='date' class='form-control form-control-sm' value='"+datetime.now().strftime('%Y-%m-%d')+"'></div>"
-    html+="<div class='col-12'><label class='label'>Reason</label><input name='reason' class='form-control form-control-sm' placeholder='Extended shift, etc'></div>"
-    html+="<div class='col-12'><button class='btn btn-ot w-100 mt-1'><i class='bi bi-plus'></i> Add Normal OT</button></div>"
-    html+="</form></div></div>"
-    # Restday OT Card
-    html+="<div class='col-12 col-md-6'><div class='card-dark card-rdot'>"
-    html+="<h6 style='color:#3b82f6'><i class='bi bi-moon-stars-fill'></i> Add RESTDAY OT</h6>"
-    html+="<form method='POST' action='/add_ot/"+str(aid)+"' class='row g-2 mt-1'>"
-    html+="<input type='hidden' name='type' value='RESTDAY_OT'>"
-    html+="<div class='col-5'><label class='label'>Hours</label><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='8' required></div>"
-    html+="<div class='col-7'><label class='label'>Date</label><input name='date' type='date' class='form-control form-control-sm' value='"+datetime.now().strftime('%Y-%m-%d')+"'></div>"
-    html+="<div class='col-12'><label class='label'>Reason</label><input name='reason' class='form-control form-control-sm' placeholder='Sunday duty, holiday'></div>"
-    html+="<div class='col-12'><button class='btn btn-rdot w-100 mt-1'><i class='bi bi-plus'></i> Add Restday OT</button></div>"
-    html+="</form></div></div>"
-    # Loss Hours Card - Full width red
-    html+="<div class='col-12'><div class='card-dark card-loss'>"
-    html+="<h6 style='color:#ef4444'><i class='bi bi-exclamation-triangle-fill'></i> Add LOSS HOURS</h6>"
-    html+="<form method='POST' action='/add_ot/"+str(aid)+"' class='row g-2 mt-1'>"
-    html+="<input type='hidden' name='type' value='LOSS'>"
-    html+="<div class='col-4'><label class='label'>Loss Hours</label><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='1.5' required></div>"
-    html+="<div class='col-4'><label class='label'>Date</label><input name='date' type='date' class='form-control form-control-sm' value='"+datetime.now().strftime('%Y-%m-%d')+"'></div>"
-    html+="<div class='col-4'><label class='label'>Type</label><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option><option>NCNS</option><option>Others</option></select></div>"
-    html+="<div class='col-12'><label class='label'>Reason / Details</label><input name='reason' class='form-control form-control-sm' placeholder='Late 1.5h - traffic, etc'></div>"
-    html+="<div class='col-12'><button class='btn btn-loss w-100 mt-1'><i class='bi bi-dash-circle'></i> Add Loss Hours</button></div>"
-    html+="</form></div></div>"
+    html+="<div class='row g-2 mt-4'>"
+    html+="<div class='col-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Add NORMAL OT</h6><form method='POST' action='/add_ot/"+str(aid)+"' class='row g-2'><input type='hidden' name='type' value='NORMAL_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='"+datetime.now().strftime("%Y-%m-%d")+"'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#22c55e;color:white'>Add Normal OT</button></div></form></div></div>"
+    html+="<div class='col-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Add RESTDAY OT</h6><form method='POST' action='/add_ot/"+str(aid)+"' class='row g-2'><input type='hidden' name='type' value='RESTDAY_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='"+datetime.now().strftime("%Y-%m-%d")+"'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#3b82f6;color:white'>Add Restday OT</button></div></form></div></div>"
+    html+="<div class='col-12'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Add LOSS HOURS</h6><form method='POST' action='/add_ot/"+str(aid)+"' class='row g-2'><input type='hidden' name='type' value='LOSS'><div class='col-4'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Loss Hrs' required></div><div class='col-4'><input name='date' type='date' class='form-control form-control-sm' value='"+datetime.now().strftime("%Y-%m-%d")+"'></div><div class='col-4'><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option></select></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#ef4444;color:white'>Add Loss</button></div></form></div></div>"
     html+="</div>"
-    html+="<div class='mt-4 card-dark' style='border:1px solid #334155'><h6 style='color:white'><i class='bi bi-clock-history'></i> Monitoring History - Normal | Restday | Loss</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>"+log_rows+"</tbody></table></div></div>"
-    html+="<hr style='border-color:#1e293b'>"
-    html+="<div class='row g-2'>"
-    html+="<div class='col-6'><div class='card-dark' style='border:1px solid #fbbf24'><div class='label'>NAME</div><div class='val'>"+str(data.get("NAME",""))+"</div></div></div>"
-    html+="<div class='col-6'><div class='card-dark' style='border:1px solid #fbbf24'><div class='label'>TENCENT ID</div><div class='val'>"+str(data.get("TENCENT_ID",""))+"</div></div></div>"
-    html+="</div>"
+    html+="<div class='mt-4'><h6 style='color:white'>History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>"+log_rows+"</tbody></table></div></div>"
     html+="</div>"
     return page(html)
 
@@ -172,9 +204,6 @@ def add_ot(aid):
     hours=request.form.get("hours","0")
     date=request.form.get("date",datetime.now().strftime("%Y-%m-%d"))
     reason=request.form.get("reason","")
-    loss_type=request.form.get("loss_type","")
-    if loss_type:
-        reason = "["+loss_type+"] " + reason
     db_root.child("ot_logs").push({"agent_id":str(aid),"type":typ,"hours":str(hours),"date":date,"reason":reason})
     return redirect("/view/"+str(aid))
 
@@ -182,20 +211,6 @@ def add_ot(aid):
 def delete_log(aid, log_id):
     db_root.child("ot_logs/"+log_id).delete()
     return redirect("/view/"+str(aid))
-
-@app.route("/add", methods=["GET","POST"])
-def add():
-    if request.method=="POST":
-        clean={"NAME":request.form.get("NAME",""),"TENCENT_ID":request.form.get("TENCENT_ID","")}
-        agents=get_all()
-        max_id=0
-        for a in agents:
-            try: max_id=max(max_id,int(a.get("id")))
-            except: pass
-        new_id=str(max_id+1)
-        db_root.child("agents/"+new_id).set(clean)
-        return redirect("/view/"+new_id)
-    return page("<div class='card-dark'><h5 style='color:white'>Add Agent</h5><form method='POST' class='row g-2'><div class='col-6'><label class='label'>NAME</label><input name='NAME' class='form-control form-control-sm'></div><div class='col-6'><label class='label'>TENCENT ID</label><input name='TENCENT_ID' class='form-control form-control-sm'></div><div class='col-12'><button class='btn btn-warning w-100 mt-2'>Save</button></div></form></div>")
 
 if __name__=="__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
