@@ -236,17 +236,34 @@ input,select{background:var(--card2)!important;color:var(--text)!important;borde
 </style></head><body>
 <nav class="navbar p-3"><div class="container-fluid">
 <a class="navbar-brand fw-bold" href="/" style="color:var(--text)">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">TEAM LEADER - TL KPI QA/AHT/ATTENDANCE</small></a>
-<div class="d-flex gap-1 align-items-center">
-<button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()" title="Light/Dark Mode">🌓 Light/Dark</button>
-<a href="/health" class="btn btn-sm btn-outline-success">OK</a>
-<a href="/logs" class="btn btn-sm btn-outline-light">📋 Logs</a>
-<a href="/working_hours" class="btn btn-sm btn-outline-light">⏱️ 220h</a>
-<a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> 
-<a href="/export" class="btn btn-sm btn-outline-success">📊 Export Excel</a>
-<a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a>
-<a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
+<div class="d-flex gap-2 align-items-center">
+<button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()" title="Light/Dark Mode">🌓</button>
+<div class="dropdown">
+  <button class="btn btn-sm btn-warning dropdown-toggle" type="button" id="mainMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size:18px;font-weight:900">
+    ☰
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mainMenuDropdown" style="background:var(--card);border:1px solid var(--border);min-width:220px">
+    <li><h6 class="dropdown-header" style="color:#fbbf24">📋 Main Menu - Three Lines Dropdown</h6></li>
+    <li><a class="dropdown-item" href="/" style="color:var(--text)">🏠 Dashboard - Main UI</a></li>
+    <li><a class="dropdown-item" href="/agents" style="color:var(--text)">👥 Agents - Add/Edit/Delete</a></li>
+    <li><a class="dropdown-item" href="/logs" style="color:var(--text)">📋 Logs - All Activities</a></li>
+    <li><a class="dropdown-item" href="/working_hours" style="color:var(--text)">⏱️ Working Hours - 220h</a></li>
+    <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
+    <li><h6 class="dropdown-header" style="color:#22c55e">📊 Export & Reports</h6></li>
+    <li><a class="dropdown-item" href="/export" style="color:var(--text)">📊 Export Excel - QA AHT Attendance</a></li>
+    <li><a class="dropdown-item" href="/export/csv" style="color:var(--text)">📥 Export CSV</a></li>
+    <li><a class="dropdown-item" href="/export/excel" style="color:var(--text)">📊 Download Excel</a></li>
+    <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
+    <li><h6 class="dropdown-header" style="color:#8b5cf6">⚙️ Settings</h6></li>
+    <li><a class="dropdown-item" href="/change_password" style="color:var(--text)">🔑 Change Password</a></li>
+    <li><a class="dropdown-item" href="/health" style="color:var(--text)">✅ Health Check - OK</a></li>
+    <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
+    <li><a class="dropdown-item" href="/logout" style="color:#ef4444">🚪 Logout</a></li>
+  </ul>
+</div>
 </div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function toggleTheme(){
   const html=document.documentElement;
@@ -255,11 +272,13 @@ function toggleTheme(){
   html.setAttribute('data-theme',next);
   localStorage.setItem('theme',next);
   const btn=document.getElementById('themeToggle');
-  if(btn) btn.textContent=next==='dark'?'🌓 Light/Dark':'☀️ Light/Dark';
+  if(btn) btn.textContent=next==='dark'?'🌓':'☀️';
 }
 (function(){
   const saved=localStorage.getItem('theme')||'dark';
   document.documentElement.setAttribute('data-theme',saved);
+  const btn=document.getElementById('themeToggle');
+  if(btn) btn.textContent=saved==='dark'?'🌓':'☀️';
 })();
 </script>
 """
@@ -489,7 +508,8 @@ def dashboard():
         wh_pct = min(100, a['wh_comp'])
         wh_color = "#22c55e" if wh_pct>=95 else "#fbbf24" if wh_pct>=90 else "#ef4444"
         st = "<span class='badge bg-danger'>Critical</span>" if a['loss']>=4 else "<span class='badge bg-success'>Good</span>"
-        html+=f"<tr><td><a href='/view/{a['id']}' style='color:white;text-decoration:none'><b>{a['name']}</b><br><small style='color:#94a3b8'>{a['tid']}</small></a></td><td style='color:#fbbf24'>{a['tot']}h</td><td>{a['target']}h</td><td><div class='progress' style='height:10px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{pct}%;background:{bar_color}'></div></div><small style='font-size:10px'>{round(a['pct'],0)}%</small></td><td><div class='progress' style='height:8px;width:80px;background:#0f172a'><div class='progress-bar' style='width:{wh_pct}%;background:{wh_color}'></div></div><small>{round(wh_pct,1)}%</small></td><td style='color:#ef4444'>{a['loss']}h</td><td>{a['qa']}% / {a['csat']}%</td><td>{st}</td></tr>"
+        av=a.get('avatar',''); av_html=f"<img src='{av}' style='width:28px;height:28px;border-radius:6px;object-fit:cover;margin-right:6px;border:1px solid #fbbf24'>" if av else f"<div style='width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#111827;margin-right:6px'>{str(a['name'])[:1]}</div>"
+        html+=f"<tr><td><a href='/view/{a['id']}' style='color:white;text-decoration:none;display:flex;align-items:center'>{av_html}<div><b>{a['name']}</b><br><small style='color:#94a3b8'>{a['tid']}</small></div></a></td><td style='color:#fbbf24'>{a['tot']}h</td><td>{a['target']}h</td><td><div class='progress' style='height:10px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{pct}%;background:{bar_color}'></div></div><small style='font-size:10px'>{round(a['pct'],0)}%</small></td><td><div class='progress' style='height:8px;width:80px;background:#0f172a'><div class='progress-bar' style='width:{wh_pct}%;background:{wh_color}'></div></div><small>{round(wh_pct,1)}%</small></td><td style='color:#ef4444'>{a['loss']}h</td><td>{a['qa']}% / {a['csat']}%</td><td>{st}</td></tr>"
     html+="</tbody></table></div></div><script>document.addEventListener('DOMContentLoaded',function(){var i=document.getElementById('teamSearch');if(!i)return;i.addEventListener('keyup',function(){var q=this.value.toLowerCase();document.querySelectorAll('#teamTable tbody tr').forEach(function(r){r.style.display=r.innerText.toLowerCase().includes(q)?'':'none';});});});</script>"
     return page(html)
 
@@ -507,7 +527,9 @@ def agents_list():
         logs=get_ot(a.get("id"))
         n,r,tot,loss,net=calc(logs)
         t_id=a.get("TENCENT ID") or a.get("TENCENT_ID","")
-        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:var(--text);text-decoration:none'><b>{a.get('NAME','')}</b><br><small style='color:var(--text2)'>{t_id} | {a.get('EMAIL','')}</small></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/agents?edit={a.get('id')}&q={q}' class='btn btn-sm btn-primary'>Edit</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent {a.get('NAME','')}?')\">X</a></td></tr>"
+        av=a.get('AVATAR') or a.get('AVATAR_URL') or ''
+        av_html=f"<img src='{av}' style='width:32px;height:32px;border-radius:8px;object-fit:cover;margin-right:8px;border:1px solid #fbbf24'>" if av else f"<div style='width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#111827;margin-right:8px'>{str(a.get('NAME','?'))[:1]}</div>"
+        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:var(--text);text-decoration:none;display:flex;align-items:center'>{av_html}<div><b>{a.get('NAME','')}</b><br><small style='color:var(--text2)'>{t_id} | {a.get('EMAIL','')}</small></div></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/agents?edit={a.get('id')}&q={q}' class='btn btn-sm btn-primary'>Edit</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent {a.get('NAME','')}?')\">X</a></td></tr>"
     if not rows:
         rows="<tr><td colspan=5 style='text-align:center;color:var(--text2)'>No agents</td></tr>"
     # Edit form if edit_id
@@ -740,6 +762,7 @@ def view(aid):
     if not perf_rows:
         perf_rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No logs</td></tr>"
     initial=str(data.get("NAME","?"))[:1]
+    avatar_url=data.get("AVATAR") or data.get("AVATAR_URL") or data.get("AVATAR IMAGE") or "" 
     target=float(data.get("TARGET_OT",20))
     wh_target=float(data.get("WORKING_HOURS_TARGET",220))
     pct=(tot/target*100) if target>0 else 0
@@ -754,7 +777,17 @@ def view(aid):
     if la>10: risk_score+=20
     risk="Critical" if risk_score>=60 else "High" if risk_score>=40 else "Moderate" if risk_score>=20 else "Low"
     risk_color="#22c55e" if risk=="Low" else "#fbbf24" if risk=="Moderate" else "#f97316" if risk=="High" else "#ef4444"
-    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'><div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div><h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"
+    avatar_html=f"<div style='width:90px;height:90px;border-radius:18px;overflow:hidden;margin:auto;border:2px solid #fbbf24'><img src='{avatar_url}' style='width:100%;height:100%;object-fit:cover'></div>" if avatar_url else f"<div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div>"
+    delete_link=f'<a href="/delete_avatar/{aid}" class="btn btn-sm btn-outline-danger" onclick="return confirm(\'Delete avatar?\')">🗑️ Remove</a>' if avatar_url else ''
+    html=f"""<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'>{avatar_html}<h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small>
+      <div class='mt-2'>
+        <form method='POST' action='/upload_avatar/{aid}' enctype='multipart/form-data' class='d-flex gap-2 justify-content-center align-items-center flex-wrap'>
+          <input type='file' name='avatar' accept='image/*' class='form-control form-control-sm' style='width:200px' required>
+          <button class='btn btn-sm btn-warning'>📸 Upload Avatar</button>
+          {delete_link}
+        </form>
+        <small style='color:var(--text2);font-size:10px'>Upload image para avatar nila - JPG/PNG max 200KB - mas maganda tignan!</small>
+      </div><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"""
     html+=f"<div class='row g-2 mt-3'><div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL</div><div class='val-big' style='color:#22c55e'>{n}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY</div><div class='val-big' style='color:#3b82f6'>{r}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS</div><div class='val-big' style='color:#ef4444'>{loss}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>{tot}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET</div><div class='val-big' style='color:#fbbf24'>+{net}h</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f97316;min-height:80px;height:80px'><div class='label'>AHT</div><div class='val-big' style='font-size:16px;color:#f97316'>{la}m</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #8b5cf6;min-height:80px;height:80px'><div class='label'>QA</div><div class='val-big' style='font-size:16px;color:#8b5cf6'>{lq}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #06b6d4;min-height:80px;height:80px'><div class='label'>CSAT</div><div class='val-big' style='font-size:16px;color:#06b6d4'>{lc}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f59e0b;min-height:80px;height:80px'><div class='label'>FCR</div><div class='val-big' style='font-size:16px;color:#f59e0b'>{lf}%</div></div></div></div>"
 
     # ViewCard AHT QA - Enhanced
@@ -1100,6 +1133,54 @@ def working_hours():
         rows+=f"<tr><td><a href='/view/{s['id']}' style='color:white'><b>{s['name']}</b><br><small style='color:#94a3b8'>{s['tid']}</small></a></td><td>{s['wh_target']}h</td><td style='color:#ef4444'>{s['loss']}h</td><td>{round(s['actual'],1)}h</td><td><div class='progress' style='height:10px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,s['comp'])}%;background:{bar_color}'></div></div><small>{round(s['comp'],1)}%</small></td><td>{s['tot']}h</td><td>{badge}</td></tr>"
     html=f"<div class='d-flex justify-content-between'><h5 style='color:white'>Working Hours - 220h Target (10h x 22 days)</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div><div class='card-dark mt-3'><div class='table-responsive'><table class='table table-sm'><thead><tr><th>AGENT</th><th>TARGET</th><th>LOSS</th><th>ACTUAL</th><th>COMPLIANCE</th><th>OT</th><th>STATUS</th></tr></thead><tbody>{rows}</tbody></table></div></div>"
     return page(html)
+
+
+@app.route("/upload_avatar/<aid>", methods=["POST"])
+@login_required
+def upload_avatar(aid):
+    try:
+        if 'avatar' not in request.files:
+            return redirect(f"/view/{aid}")
+        file=request.files['avatar']
+        if file.filename=='':
+            return redirect(f"/view/{aid}")
+        # Check file type
+        if not file.content_type.startswith('image/'):
+            return redirect(f"/view/{aid}")
+        # Read and encode as base64 for storage in Firebase (simple solution)
+        import base64
+        data=file.read()
+        # Limit size to 200KB to avoid Firebase limits
+        if len(data)>200*1024:
+            # Resize? For now just reject
+            return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Image too large - max 200KB</h6><a href='/view/{aid}' class='btn btn-sm btn-outline-light'>Back</a></div>")
+        b64=base64.b64encode(data).decode('utf-8')
+        mime=file.content_type
+        data_url=f"data:{mime};base64,{b64}"
+        if db_root:
+            db_root.child(f"agents/{aid}/AVATAR").set(data_url)
+            # Also store as AVATAR_URL for compatibility
+            db_root.child(f"agents/{aid}/AVATAR_URL").set(data_url)
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": session.get("role"),"type": f"UPLOAD_AVATAR {aid}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": aid})
+            except:
+                pass
+    except Exception as e:
+        print(f"upload_avatar error: {e}")
+        traceback.print_exc()
+    return redirect(f"/view/{aid}")
+
+@app.route("/delete_avatar/<aid>")
+@login_required
+def delete_avatar(aid):
+    try:
+        if db_root:
+            db_root.child(f"agents/{aid}/AVATAR").delete()
+            db_root.child(f"agents/{aid}/AVATAR_URL").delete()
+    except:
+        pass
+    return redirect(f"/view/{aid}")
+
 
 @app.route("/export")
 @login_required
