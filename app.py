@@ -58,7 +58,7 @@ BASE1 = """<!doctype html><html><head><meta name="viewport" content="width=devic
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 body{background:#0b1120;color:#f1f5f9}
-.card-dark{background:#151e32;border:1px solid #1e293b;border-radius:20px;padding:16px}
+.card-dark{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
 .kpi{padding:14px;border-radius:14px;background:#151e32;border:1px solid #1e293b;text-align:center}
 .label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
 .val{color:#ffffff;font-weight:700}
@@ -114,13 +114,13 @@ def view(aid):
         log_rows="<tr><td colspan=5 style='color:#64748b;text-align:center'>No logs yet - add OT or Loss below</td></tr>"
     initial=str(data.get("NAME","?"))[:1]
     html="<a href='/' class='btn btn-sm btn-outline-light mb-3'><i class='bi bi-arrow-left'></i> Back Dashboard</a>"
-    html+="<div class='card-dark'>"
+    html+="<div class='card-dark' style='border:1px solid #334155'>"
     html+="<div class='text-center'><div class='avatar'>"+initial+"</div><h4 style='color:white;margin-top:12px'>"+str(data.get("NAME",""))+"</h4><small style='color:#94a3b8'>"+str(data.get("TENCENT_ID",""))+" • ID:"+str(aid)+"</small></div>"
     html+="<div class='row g-2 mt-3'>"
-    html+="<div class='col-4'><div class='kpi'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(n)+"h</div></div></div>"
-    html+="<div class='col-4'><div class='kpi'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(r)+"h</div></div></div>"
-    html+="<div class='col-4'><div class='kpi'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(loss)+"h</div></div></div>"
-    html+="<div class='col-6'><div class='kpi'><div class='label'>TOTAL OT (N+RD)</div><div class='val-big' style='color:#22c55e'>"+str(tot)+"h</div><small style='color:#94a3b8'>N:"+str(n)+" + RD:"+str(r)+"</small></div></div>"
+    html+="<div class='col-4'><div class='kpi' style='border:1px solid #22c55e;box-shadow:0 0 10px rgba(34,197,94,0.15)'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(n)+"h</div></div></div>"
+    html+="<div class='col-4'><div class='kpi' style='border:1px solid #3b82f6;box-shadow:0 0 10px rgba(59,130,246,0.15)'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(r)+"h</div></div></div>"
+    html+="<div class='col-4'><div class='kpi' style='border:1px solid #ef4444;box-shadow:0 0 10px rgba(239,68,68,0.15)'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(loss)+"h</div></div></div>"
+    html+="<div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT (N+RD)</div><div class='val-big' style='color:#22c55e'>"+str(tot)+"h</div><small style='color:#94a3b8'>N:"+str(n)+" + RD:"+str(r)+"</small></div></div>"
     html+="<div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET (OT-LOSS)</div><div class='val-big' style='color:#fbbf24'>+"+str(net)+"h</div></div></div>"
     html+="</div>"
     # OT Input UI - 2 columns: Normal+Restday vs Loss
@@ -157,11 +157,11 @@ def view(aid):
     html+="<div class='col-12'><button class='btn btn-loss w-100 mt-1'><i class='bi bi-dash-circle'></i> Add Loss Hours</button></div>"
     html+="</form></div></div>"
     html+="</div>"
-    html+="<div class='mt-4'><h6 style='color:white'><i class='bi bi-clock-history'></i> Monitoring History - Normal | Restday | Loss</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>"+log_rows+"</tbody></table></div></div>"
+    html+="<div class='mt-4 card-dark' style='border:1px solid #334155'><h6 style='color:white'><i class='bi bi-clock-history'></i> Monitoring History - Normal | Restday | Loss</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>"+log_rows+"</tbody></table></div></div>"
     html+="<hr style='border-color:#1e293b'>"
     html+="<div class='row g-2'>"
-    html+="<div class='col-6'><div class='card-dark'><div class='label'>NAME</div><div class='val'>"+str(data.get("NAME",""))+"</div></div></div>"
-    html+="<div class='col-6'><div class='card-dark'><div class='label'>TENCENT ID</div><div class='val'>"+str(data.get("TENCENT_ID",""))+"</div></div></div>"
+    html+="<div class='col-6'><div class='card-dark' style='border:1px solid #fbbf24'><div class='label'>NAME</div><div class='val'>"+str(data.get("NAME",""))+"</div></div></div>"
+    html+="<div class='col-6'><div class='card-dark' style='border:1px solid #fbbf24'><div class='label'>TENCENT ID</div><div class='val'>"+str(data.get("TENCENT_ID",""))+"</div></div></div>"
     html+="</div>"
     html+="</div>"
     return page(html)
