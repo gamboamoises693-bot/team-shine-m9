@@ -454,10 +454,79 @@ def agents_list():
     for a in filtered:
         logs=get_ot(a.get("id"))
         n,r,tot,loss,net=calc(logs)
-        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:white'><b>{a.get('NAME','')}</b><br><small style='color:#94a3b8'>{a.get('TENCENT_ID')}</small></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a></td></tr>"
+        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:white'><b>{a.get('NAME','')}</b><br><small style='color:#94a3b8'>{a.get('TENCENT_ID')}</small></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent?')\">X</a></td></tr>"
     if not rows:
         rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No agents</td></tr>"
-    return page(f"<div class='d-flex justify-content-between'><h5 style='color:white'>All Agents ({len(filtered)}/{len(agents)})</h5><div class='d-flex gap-2'><form method='GET' class='d-flex gap-2'><input name='q' value='{q}' class='form-control form-control-sm' placeholder='Search...' style='width:180px'><button class='btn btn-sm btn-warning'>Search</button></form><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div></div><div class='card-dark mt-3'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>AGENT</th><th>TOTAL</th><th>LOSS</th><th></th></tr></thead><tbody>{rows}</tbody></table></div></div>")
+    return page(f"""
+    <div class='d-flex justify-content-between flex-wrap gap-2'><h5 style='color:white'>All Agents ({len(filtered)}/{len(agents)}) - Add Agent UI</h5><div class='d-flex gap-2'><form method='GET' class='d-flex gap-2'><input name='q' value='{q}' class='form-control form-control-sm' placeholder='Search...' style='width:180px'><button class='btn btn-sm btn-warning'>Search</button></form><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div></div>
+    <div class='card-dark mt-3' style='border:1px solid #22c55e'>
+      <h6 style='color:#22c55e'>➕ Add New Agent - DB Fields: NAME, TENCENT_ID, TARGET_OT, WORKING_HOURS_TARGET</h6>
+      <small style='color:#94a3b8'>Fields from Firebase: id (auto), NAME, TENCENT_ID, TARGET_OT (default 20), WORKING_HOURS_TARGET (default 220), LOGIN_PASS (default = TENCENT_ID)</small>
+      <form method='POST' action='/add_agent' class='row g-2 mt-2'>
+        <div class='col-6 col-md-3'><label class='label'>NAME (Last, First)</label><input name='name' class='form-control form-control-sm' placeholder='Ex: Dela Cruz, Juan' required></div>
+        <div class='col-6 col-md-2'><label class='label'>TENCENT_ID (4909)</label><input name='tencent_id' class='form-control form-control-sm' placeholder='Ex: 4909' required></div>
+        <div class='col-6 col-md-2'><label class='label'>TARGET_OT (20h)</label><input name='target_ot' type='number' step='0.5' class='form-control form-control-sm' value='20' required></div>
+        <div class='col-6 col-md-2'><label class='label'>WH_TARGET (220h)</label><input name='wh_target' type='number' step='1' class='form-control form-control-sm' value='220' required></div>
+        <div class='col-12 col-md-3 d-flex align-items-end'><button class='btn btn-success w-100'>➕ Add Agent</button></div>
+      </form>
+    </div>
+    <div class='card-dark mt-3'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>AGENT</th><th>TOTAL OT</th><th>LOSS</th><th>ACTION</th></tr></thead><tbody>{rows}</tbody></table></div></div>
+    """)
+
+@app.route("/add_agent", methods=["POST"])
+@login_required
+def add_agent():
+    if session.get("role")=="agent":
+        return redirect("/")
+    try:
+        name=request.form.get("name","").strip()
+        tencent_id=request.form.get("tencent_id","").strip()
+        target_ot=request.form.get("target_ot","20").strip()
+        wh_target=request.form.get("wh_target","220").strip()
+        if not name or not tencent_id:
+            return redirect("/agents")
+        # Generate new ID - find max ID
+        agents=get_all()
+        max_id=0
+        for a in agents:
+            try:
+                max_id=max(max_id, int(a.get("id",0)))
+            except:
+                pass
+        new_id=str(max_id+1)
+        if db_root:
+            db_root.child(f"agents/{new_id}").set({
+                "id": new_id,
+                "NAME": name,
+                "TENCENT_ID": tencent_id,
+                "TARGET_OT": str(target_ot),
+                "WORKING_HOURS_TARGET": str(wh_target),
+                "LOGIN_PASS": tencent_id
+            })
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": "admin","type": f"ADD_AGENT {name} ({tencent_id})","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": new_id})
+            except:
+                pass
+    except Exception as e:
+        print(f"add_agent error: {e}")
+        traceback.print_exc()
+    return redirect("/agents")
+
+@app.route("/delete_agent/<aid>")
+@login_required
+def delete_agent(aid):
+    if session.get("role")!="admin":
+        return redirect("/agents")
+    try:
+        if db_root:
+            db_root.child(f"agents/{aid}").delete()
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": "admin","type": f"DELETE_AGENT ID {aid}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": aid})
+            except:
+                pass
+    except:
+        pass
+    return redirect("/agents")
 
 @app.route("/view/<aid>")
 @login_required
