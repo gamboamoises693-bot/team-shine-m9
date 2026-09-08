@@ -221,27 +221,47 @@ BASE_HEAD = """<!doctype html><html><head><meta name="viewport" content="width=d
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body{background:#0b1120;color:#f1f5f9;font-family:Inter,system-ui}
-.card-dark{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:16px}
-.kpi{padding:12px 8px;border-radius:16px;background:#151e32;border:1px solid #2d3748;text-align:center;min-height:110px;height:110px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-.label{font-size:9px;color:#94a3b8;text-transform:uppercase;font-weight:600;min-height:22px;display:flex;align-items:center;justify-content:center}
+:root{--bg:#0b1120;--card:#151e32;--card2:#0f172a;--border:#2d3748;--border2:#1e293b;--text:#f1f5f9;--text2:#94a3b8;--yellow:#fbbf24}
+[data-theme="light"]{--bg:#f1f5f9;--card:#ffffff;--card2:#e2e8f0;--border:#cbd5e1;--border2:#e2e8f0;--text:#0f172a;--text2:#475569}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui;transition:background 0.3s,color 0.3s}
+.card-dark{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;transition:all 0.3s}
+.kpi{padding:12px 8px;border-radius:16px;background:var(--card);border:1px solid var(--border);text-align:center;min-height:110px;height:110px;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:all 0.3s}
+.label{font-size:9px;color:var(--text2);text-transform:uppercase;font-weight:600;min-height:22px;display:flex;align-items:center;justify-content:center}
 .val-big{font-size:22px;font-weight:800;margin-top:2px}
-.chart-card{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:16px}
-.table thead th{background:#0f172a!important;color:#fbbf24!important;font-size:10px;text-transform:uppercase;border:none!important}
-.table tbody td{background:#151e32!important;border-color:#1e293b!important;color:#e2e8f0!important;padding:12px 8px}
-input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px solid #334155!important}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;transition:all 0.3s}
+.table thead th{background:var(--card2)!important;color:#fbbf24!important;font-size:10px;text-transform:uppercase;border:none!important}
+.table tbody td{background:var(--card)!important;border-color:var(--border2)!important;color:var(--text)!important;padding:12px 8px}
+input,select{background:var(--card2)!important;color:var(--text)!important;border:1px solid var(--border)!important}
+.navbar{background:var(--card2)!important;border-bottom:1px solid var(--border2)!important;transition:all 0.3s}
 </style></head><body>
-<nav class="navbar p-3" style="background:#0f172a;border-bottom:1px solid #1e293b"><div class="container-fluid">
-<a class="navbar-brand fw-bold text-light" href="/">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">TEAM LEADER</small></a>
-<div class="d-flex gap-1">
+<nav class="navbar p-3"><div class="container-fluid">
+<a class="navbar-brand fw-bold" href="/" style="color:var(--text)">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">TEAM LEADER - TL KPI QA/AHT/ATTENDANCE</small></a>
+<div class="d-flex gap-1 align-items-center">
+<button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()" title="Light/Dark Mode">🌓 Light/Dark</button>
 <a href="/health" class="btn btn-sm btn-outline-success">OK</a>
 <a href="/logs" class="btn btn-sm btn-outline-light">📋 Logs</a>
 <a href="/working_hours" class="btn btn-sm btn-outline-light">⏱️ 220h</a>
 <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> 
+<a href="/export" class="btn btn-sm btn-outline-success">📊 Export Excel</a>
 <a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a>
 <a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
 </div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
+<script>
+function toggleTheme(){
+  const html=document.documentElement;
+  const current=html.getAttribute('data-theme')||'dark';
+  const next=current==='dark'?'light':'dark';
+  html.setAttribute('data-theme',next);
+  localStorage.setItem('theme',next);
+  const btn=document.getElementById('themeToggle');
+  if(btn) btn.textContent=next==='dark'?'🌓 Light/Dark':'☀️ Light/Dark';
+}
+(function(){
+  const saved=localStorage.getItem('theme')||'dark';
+  document.documentElement.setAttribute('data-theme',saved);
+})();
+</script>
 """
 
 BASE_FOOT = "</div><footer style='text-align:center;padding:24px;color:#64748b;font-size:12px;border-top:1px solid #1e293b;margin-top:30px'><div>Developed By : <span style='color:#fbbf24;font-weight:700'>Moises Gamboa</span> | Computer Engineer</div></footer></body></html>"
@@ -356,6 +376,20 @@ def dashboard():
         wh_comp=((wh_target-loss)/wh_target*100) if wh_target>0 else 0
         agent_stats.append({"id":a.get("id"),"name":a.get("NAME",""),"tid":a.get("TENCENT_ID",""),"n":n,"r":r,"tot":tot,"loss":loss,"net":net,"aht":la,"qa":lq,"csat":lc,"fcr":lf,"target":target,"pct":pct,"wh_target":wh_target,"wh_comp":wh_comp})
     avg_ot=team_tot/len(agents) if agents else 0
+    team_qa_vals=[a["qa"] for a in agent_stats if a["qa"]>0]
+    team_aht_vals=[a["aht"] for a in agent_stats if a["aht"]>0]
+    team_csat_vals=[a["csat"] for a in agent_stats if a["csat"]>0]
+    team_fcr_vals=[a["fcr"] for a in agent_stats if a["fcr"]>0]
+    team_wh_comp_vals=[a["wh_comp"] for a in agent_stats]
+    avg_qa_team=sum(team_qa_vals)/len(team_qa_vals) if team_qa_vals else 0
+    avg_aht_team=sum(team_aht_vals)/len(team_aht_vals) if team_aht_vals else 0
+    avg_csat_team=sum(team_csat_vals)/len(team_csat_vals) if team_csat_vals else 0
+    avg_fcr_team=sum(team_fcr_vals)/len(team_fcr_vals) if team_fcr_vals else 0
+    avg_wh_comp_team=sum(team_wh_comp_vals)/len(team_wh_comp_vals) if team_wh_comp_vals else 0
+    total_wh_target=sum([a["wh_target"] for a in agent_stats])
+    total_loss=sum([a["loss"] for a in agent_stats])
+    total_actual=total_wh_target-total_loss
+    overall_attendance=(total_actual/total_wh_target*100) if total_wh_target>0 else 0
     labels, nd, rd, td, ld, netd, ahtd, qad = get_filtered_stats(period, year, month, quarter, week)
     
     # Alerts
@@ -382,6 +416,17 @@ def dashboard():
     html=alerts_html+filter_html
     html+=f"<div class='row g-2'><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>{round(team_n,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>{round(team_r,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#fbbf24'>{round(team_tot,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>{round(team_loss,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #a855f7'><div class='label'>TEAM NET</div><div class='val-big' style='color:#a855f7'>+{round(team_tot-team_loss,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #06b6d4'><div class='label'>AVG OT</div><div class='val-big' style='color:#06b6d4'>{round(avg_ot,1)}h</div></div></div></div>"
     
+
+
+    html+="<div class='row g-2 mt-3'>"
+    html+=f"<div class='col-12'><h6 style='color:#fbbf24;margin:8px 0'>📊 TL Overall Team KPI - QA, AHT, ATTENDANCE (Main UI for TL)</h6></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #8b5cf6'><div class='label'>TEAM AVG QA</div><div class='val-big' style='color:#8b5cf6'>{round(avg_qa_team,1)}%</div><small style='color:var(--text2);font-size:10px'>{len(team_qa_vals)} agents</small></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #f97316'><div class='label'>TEAM AVG AHT</div><div class='val-big' style='color:#f97316'>{round(avg_aht_team,1)}m</div><small style='color:var(--text2);font-size:10px'>{len(team_aht_vals)} agents</small></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #22c55e'><div class='label'>TEAM ATTENDANCE</div><div class='val-big' style='color:#22c55e'>{round(overall_attendance,1)}%</div><small style='color:var(--text2);font-size:10px'>{round(total_actual,1)}/{total_wh_target}h</small></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #06b6d4'><div class='label'>TEAM AVG CSAT</div><div class='val-big' style='color:#06b6d4'>{round(avg_csat_team,1)}%</div><small style='color:var(--text2);font-size:10px'>{len(team_csat_vals)} agents</small></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #f59e0b'><div class='label'>TEAM AVG FCR</div><div class='val-big' style='color:#f59e0b'>{round(avg_fcr_team,1)}%</div><small style='color:var(--text2);font-size:10px'>{len(team_fcr_vals)} agents</small></div></div>"
+    html+=f"<div class='col-6 col-md-2'><div class='kpi' style='border:2px solid #22c55e'><div class='label'>WH COMP AVG</div><div class='val-big' style='color:#22c55e'>{round(avg_wh_comp_team,1)}%</div><small style='color:var(--text2);font-size:10px'>Overall</small></div></div>"
+    html+="</div>"
 
     # Top 3 Ranking UI - Enhanced ViewCard
     top3=sorted(agent_stats, key=lambda x: x["tot"], reverse=True)[:3]
@@ -412,7 +457,7 @@ def dashboard():
         html+="<div style='color:#64748b;text-align:center;padding:20px'>No CSAT data<br><small>Add CSAT logs</small></div>"
     html+="</div></div></div></div>"
     # Charts
-    # Charts
+    # Charts - TL KPI QA, AHT, ATTENDANCE Graphs
     html+=f"""
     <div class="row g-3 mt-3">
       <div class="col-12 col-md-6"><div class="chart-card" style="border:1px solid #22c55e"><h6 style="color:#22c55e">Normal OT - {period}</h6><canvas id="chartNormal"></canvas></div></div>
@@ -420,13 +465,19 @@ def dashboard():
       <div class="col-12 col-md-6"><div class="chart-card" style="border:1px solid #fbbf24"><h6 style="color:#fbbf24">Total OT</h6><canvas id="chartTotal"></canvas></div></div>
       <div class="col-12 col-md-6"><div class="chart-card" style="border:1px solid #ef4444"><h6 style="color:#ef4444">Loss Hrs</h6><canvas id="chartLoss"></canvas></div></div>
     </div>
+    <div class="row g-3 mt-3">
+      <div class="col-12"><h6 style="color:#fbbf24;margin:8px 0">📈 TL Team KPI Graphs - QA, AHT, ATTENDANCE (Main UI for TL)</h6></div>
+      <div class="col-12 col-md-4"><div class="chart-card" style="border:1px solid #8b5cf6"><h6 style="color:#8b5cf6">Team QA Trend - {period}</h6><canvas id="chartQA"></canvas></div></div>
+      <div class="col-12 col-md-4"><div class="chart-card" style="border:1px solid #f97316"><h6 style="color:#f97316">Team AHT Trend - {period}</h6><canvas id="chartAHT"></canvas></div></div>
+      <div class="col-12 col-md-4"><div class="chart-card" style="border:1px solid #22c55e"><h6 style="color:#22c55e">Team Attendance Trend - {period}</h6><canvas id="chartAttendance"></canvas></div></div>
+    </div>
     <script>
     const labels = {labels};
     const nd = {nd}; const rd = {rd}; const td = {td}; const ld = {ld};
     function makeChart(id, label, data, color){{
       new Chart(document.getElementById(id), {{type:'line', data:{{labels: labels, datasets:[{{label: label, data: data, borderColor: color, backgroundColor: color+'33', fill:true, tension:0.4}}]}}, options:{{responsive:true, plugins:{{legend:{{display:false}}}}, scales:{{y:{{beginAtZero:true}}}}}}}});
     }}
-    makeChart('chartNormal','Normal',nd,'#22c55e'); makeChart('chartRestday','Restday',rd,'#3b82f6'); makeChart('chartTotal','Total',td,'#fbbf24'); makeChart('chartLoss','Loss',ld,'#ef4444');
+    makeChart('chartNormal','Normal',nd,'#22c55e'); makeChart('chartRestday','Restday',rd,'#3b82f6'); makeChart('chartTotal','Total',td,'#fbbf24'); makeChart('chartLoss','Loss',ld,'#ef4444'); makeChart('chartQA','QA',qad,'#8b5cf6'); makeChart('chartAHT','AHT',ahtd,'#f97316'); makeChart('chartAttendance','Attendance',netd,'#22c55e');
     </script>
     """
     
@@ -942,7 +993,14 @@ def working_hours():
 @app.route("/export")
 @login_required
 def export_page():
-    return page("<h5 style='color:white'>Export</h5><div class='card-dark mt-3'><a href='/export/csv' class='btn btn-success w-100'>Download CSV</a></div>")
+    return page("""
+    <h5 style='color:var(--text)'>📊 Export - TL Team KPI - QA, AHT, ATTENDANCE + Excel + Light/Dark</h5>
+    <div class='row g-3 mt-3'>
+      <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Export CSV - Overall Team KPI</h6><p style='color:var(--text2);font-size:12px'>CSV with QA, AHT, Attendance, OT, Loss, WH Compliance - TL Main UI</p><a href='/export/csv' class='btn btn-success w-100'>📥 Download CSV</a></div></div>
+      <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Export Excel - TL KPI QA AHT ATTENDANCE</h6><p style='color:var(--text2);font-size:12px'>Excel with 3 sheets: TL Summary, Agents Detail, Logs + Graphs data</p><a href='/export/excel' class='btn btn-primary w-100'>📊 Download Excel</a></div></div>
+      <div class='col-12'><div class='card-dark' style='border:1px solid #fbbf24'><h6 style='color:#fbbf24'>TL Overall Team KPI Summary - QA, AHT, ATTENDANCE Graphs</h6><p style='color:var(--text2);font-size:12px'>Includes: Team Avg QA, Team Avg AHT, Team Attendance %, WH Compliance, OT totals, Loss, Net + Monthly trend graphs</p><small style='color:var(--text2)'>Light/Dark Mode: Toggle 🌓 button sa navbar - saved sa browser</small></div></div>
+    </div>
+    """)
 
 @app.route("/export/csv")
 @login_required
@@ -960,6 +1018,124 @@ def export_csv():
         wh_comp=((wh_target-loss)/wh_target*100) if wh_target>0 else 0
         writer.writerow([a.get("id"),a.get("NAME"),a.get("TENCENT_ID"),tot,loss,net,la,lq,lc,lf,wh_target,round(wh_comp,1)])
     return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition":"attachment;filename=team_shine_m9.csv"})
+
+
+@app.route("/export/excel")
+@login_required
+def export_excel():
+    try:
+        import io
+        agents=get_all()
+        output=io.StringIO()
+        try:
+            from openpyxl import Workbook
+            wb=Workbook()
+            ws=wb.active
+            ws.title="TL Team KPI - QA AHT ATTENDANCE"
+            ws.append(["TEAM SHINE M9 - TL OVERALL KPI - QA, AHT, ATTENDANCE"])
+            ws.append(["Generated", datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p")])
+            ws.append([])
+            ws.append(["METRIC", "VALUE", "UNIT", "DETAILS"])
+            agent_stats=[]
+            team_n=0; team_r=0; team_loss=0; team_tot=0
+            for a in agents:
+                logs=get_ot(a.get("id"))
+                n,r,tot,loss,net=calc(logs)
+                team_n+=n; team_r+=r; team_loss+=loss; team_tot+=tot
+                plogs=get_perf(a.get("id"))
+                la,lq,lc,lf,aa,qa,ac,af=calc_perf(plogs)
+                agent_stats.append({"name":a.get("NAME",""),"tid":a.get("TENCENT_ID",""),"tot":tot,"loss":loss,"qa":lq,"aht":la,"csat":lc,"fcr":lf,"wh_target":float(a.get("WORKING_HOURS_TARGET",220))})
+            team_qa=[a["qa"] for a in agent_stats if a["qa"]>0]
+            team_aht=[a["aht"] for a in agent_stats if a["aht"]>0]
+            team_csat=[a["csat"] for a in agent_stats if a["csat"]>0]
+            team_fcr=[a["fcr"] for a in agent_stats if a["fcr"]>0]
+            total_wh=sum([a["wh_target"] for a in agent_stats])
+            total_actual=total_wh-team_loss
+            overall_att=(total_actual/total_wh*100) if total_wh>0 else 0
+            ws.append(["Team Avg QA", round(sum(team_qa)/len(team_qa),1) if team_qa else 0, "%", f"{len(team_qa)} agents"])
+            ws.append(["Team Avg AHT", round(sum(team_aht)/len(team_aht),1) if team_aht else 0, "minutes", f"{len(team_aht)} agents"])
+            ws.append(["Team Avg CSAT", round(sum(team_csat)/len(team_csat),1) if team_csat else 0, "%", f"{len(team_csat)} agents"])
+            ws.append(["Team Avg FCR", round(sum(team_fcr)/len(team_fcr),1) if team_fcr else 0, "%", f"{len(team_fcr)} agents"])
+            ws.append(["Team Attendance", round(overall_att,1), "%", f"{round(total_actual,1)}/{total_wh}h"])
+            ws.append(["Total Normal OT", round(team_n,1), "h", ""])
+            ws.append(["Total Restday OT", round(team_r,1), "h", ""])
+            ws.append(["Total OT", round(team_tot,1), "h", ""])
+            ws.append(["Total Loss", round(team_loss,1), "h", ""])
+            ws.append(["Team Net", round(team_tot-team_loss,1), "h", ""])
+            ws.append([])
+            ws.append(["AGENT DETAIL - QA, AHT, ATTENDANCE KPI"])
+            ws.append(["ID","NAME","TENCENT_ID","TOTAL_OT","LOSS","NET","AHT","QA","CSAT","FCR","WH_TARGET","WH_ACTUAL","WH_COMP%"])
+            for a in agents:
+                logs=get_ot(a.get("id"))
+                n,r,tot,loss,net=calc(logs)
+                plogs=get_perf(a.get("id"))
+                la,lq,lc,lf,aa,qa,ac,af=calc_perf(plogs)
+                wh_target=float(a.get("WORKING_HOURS_TARGET",220))
+                wh_actual=wh_target-loss
+                wh_comp=(wh_actual/wh_target*100) if wh_target>0 else 0
+                ws.append([a.get("id"),a.get("NAME"),a.get("TENCENT_ID"),tot,loss,net,la,lq,lc,lf,wh_target,round(wh_actual,1),round(wh_comp,1)])
+            ws2=wb.create_sheet("OT Logs")
+            ws2.append(["Agent ID","Name","Tencent ID","Date","Type","Hours","Reason"])
+            all_ot=get_all_ot()
+            for l in all_ot:
+                aname=""; tid=""
+                for a in agents:
+                    if str(a.get("id"))==str(l.get("agent_id")):
+                        aname=a.get("NAME",""); tid=a.get("TENCENT_ID",""); break
+                ws2.append([l.get("agent_id"),aname,tid,l.get("date"),l.get("type"),l.get("hours"),l.get("reason")])
+            ws3=wb.create_sheet("QA AHT ATTENDANCE Logs")
+            ws3.append(["Agent ID","Name","Tencent ID","Date","Type","Value","Reason"])
+            all_perf=get_all_perf()
+            for l in all_perf:
+                aname=""; tid=""
+                for a in agents:
+                    if str(a.get("id"))==str(l.get("agent_id")):
+                        aname=a.get("NAME",""); tid=a.get("TENCENT_ID",""); break
+                ws3.append([l.get("agent_id"),aname,tid,l.get("date"),l.get("type"),l.get("value"),l.get("reason")])
+            from io import BytesIO
+            bio=BytesIO()
+            wb.save(bio)
+            bio.seek(0)
+            return Response(bio.getvalue(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition":"attachment;filename=Team_Shine_M9_TL_KPI_QA_AHT_ATTENDANCE.xlsx"})
+        except ImportError:
+            output=io.StringIO()
+            import csv
+            writer=csv.writer(output)
+            writer.writerow(["TEAM SHINE M9 - TL KPI - QA, AHT, ATTENDANCE"])
+            writer.writerow(["Generated", datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p")])
+            writer.writerow([])
+            writer.writerow(["METRIC","VALUE"])
+            agent_stats=[]
+            team_n=0; team_r=0; team_loss=0; team_tot=0
+            for a in agents:
+                logs=get_ot(a.get("id"))
+                n,r,tot,loss,net=calc(logs)
+                team_n+=n; team_r+=r; team_loss+=loss; team_tot+=tot
+                plogs=get_perf(a.get("id"))
+                la,lq,lc,lf,aa,qa,ac,af=calc_perf(plogs)
+                agent_stats.append({"qa":lq,"aht":la,"csat":lc,"fcr":lf,"wh_target":float(a.get("WORKING_HOURS_TARGET",220))})
+            team_qa=[a["qa"] for a in agent_stats if a["qa"]>0]
+            team_aht=[a["aht"] for a in agent_stats if a["aht"]>0]
+            writer.writerow(["Team Avg QA", round(sum(team_qa)/len(team_qa),1) if team_qa else 0])
+            writer.writerow(["Team Avg AHT", round(sum(team_aht)/len(team_aht),1) if team_aht else 0])
+            writer.writerow(["Total OT", team_tot])
+            writer.writerow(["Total Loss", team_loss])
+            writer.writerow([])
+            writer.writerow(["ID","NAME","TENCENT_ID","TOTAL_OT","LOSS","AHT","QA","WH_TARGET","WH_COMP"])
+            for a in agents:
+                logs=get_ot(a.get("id"))
+                n,r,tot,loss,net=calc(logs)
+                plogs=get_perf(a.get("id"))
+                la,lq,lc,lf,aa,qa,ac,af=calc_perf(plogs)
+                wh_target=float(a.get("WORKING_HOURS_TARGET",220))
+                wh_comp=((wh_target-loss)/wh_target*100) if wh_target>0 else 0
+                writer.writerow([a.get("id"),a.get("NAME"),a.get("TENCENT_ID"),tot,loss,la,lq,wh_target,round(wh_comp,1)])
+            return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition":"attachment;filename=Team_Shine_M9_TL_KPI.csv"})
+    except Exception as e:
+        print(f"export_excel error: {e}")
+        traceback.print_exc()
+        return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Export Error</h6><pre style='color:#fbbf24;font-size:10px'>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+
 
 if __name__=="__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
