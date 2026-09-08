@@ -581,21 +581,21 @@ def view(aid):
         </div>
       </div>
       <div class="col-12 col-md-6">
-        <div class="card-dark" style="border:2px solid #06b6d4;background:linear-gradient(135deg,#083344,#0f172a);min-height:160px">
+        <div class="card-dark" style="border:2px solid #06b6d4;background:linear-gradient(135deg,#0c4a6e,#0f172a);min-height:160px">
           <div class="d-flex justify-content-between align-items-center">
-            <h6 style="color:#06b6d4;margin:0">😊 CSAT ViewCard</h6>
-            <span class="badge" style="background:{csat_color};font-size:10px">{csat_status}</span>
+            <h6 style="color:#06b6d4;margin:0">⏱️ AHT vs Target & Industry</h6>
+            <span class="badge" style="background:{aht_color};font-size:10px">AHT {aht_status}</span>
           </div>
           <div class="row mt-3">
             <div class="col-6 text-center" style="border-right:1px solid #334155">
-              <div style="color:#94a3b8;font-size:10px">Latest CSAT</div>
-              <div style="color:#06b6d4;font-size:36px;font-weight:900">{lc}<small style="font-size:14px">%</small></div>
-              <small style="color:#94a3b8">Target 85%+ Good</small>
+              <div style="color:#94a3b8;font-size:10px">AHT TARGET</div>
+              <div style="color:#06b6d4;font-size:18px;font-weight:800">≤7m Good<br><small style="font-size:11px">≤10m Warning</small></div>
+              <div class="mt-2"><div class="progress" style="height:8px;width:100%;background:#0f172a"><div class="progress-bar" style="width:{min(100,(la/7*100) if la>0 else 0)}%;background:{aht_color}"></div></div></div>
             </div>
             <div class="col-6 text-center">
-              <div style="color:#94a3b8;font-size:10px">Average CSAT</div>
-              <div style="color:white;font-size:28px;font-weight:800">{round(ac,1)}<small style="font-size:12px">%</small></div>
-              <small style="color:#94a3b8">All logs avg</small>
+              <div style="color:#94a3b8;font-size:10px">Industry 6m 3s avg</div>
+              <div style="color:white;font-size:13px;font-weight:700">6m 3s avg<br>Telco 8m 48s</div>
+              <small style="color:#94a3b8">Your AHT: {la}m</small>
             </div>
           </div>
         </div>
@@ -632,7 +632,30 @@ def view(aid):
         html+=f"""<div class="card-dark mt-3" style="border:1px solid #fbbf24"><h6 style="color:#fbbf24">My Account</h6><a href="/change_password" class="btn btn-sm btn-warning w-100">Change Password</a></div>"""
     if not is_agent:
         html+=f"<div class='row g-2 mt-4'><div class='col-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Add NORMAL OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='NORMAL_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#22c55e;color:white'>Add Normal OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Add RESTDAY OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='RESTDAY_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#3b82f6;color:white'>Add Restday</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f97316'><h6 style='color:#f97316'>Add AHT</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='AHT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='Minutes' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f97316;color:white'>Add AHT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>Add QA</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='QA'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='%' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='QA notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#8b5cf6;color:white'>Add QA</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #06b6d4'><h6 style='color:#06b6d4'>Add CSAT</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='CSAT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='CSAT %' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Feedback'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#06b6d4;color:white'>Add CSAT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f59e0b'><h6 style='color:#f59e0b'>Add FCR</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='FCR'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='FCR %' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f59e0b;color:white'>Add FCR</button></div></form></div></div><div class='col-12'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Add LOSS HOURS</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='LOSS'><div class='col-4'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Loss Hrs' required></div><div class='col-4'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-4'><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option><option>Emergency</option></select></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#ef4444;color:white'>Add Loss</button></div></form></div></div></div>"
-        html+=f"<div class='mt-4'><h6 style='color:white'>OT & Loss History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>{log_rows}</tbody></table></div></div><div class='mt-3'><h6 style='color:white'>AHT/QA/CSAT/FCR History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>{perf_rows}</tbody></table></div></div>"
+        html+=f"""
+      <div class='mt-4'>
+        <div class='d-flex justify-content-between align-items-center flex-wrap gap-2'>
+          <h6 style='color:white;margin:0'>OT & Loss History - Previous Performance</h6>
+          <input id='otSearch' class='form-control form-control-sm' placeholder='Search previous...' style='width:220px'>
+        </div>
+        <small style='color:#94a3b8'>Search tulad ng main dashboard</small>
+        <div class='table-responsive mt-2'><table id='otTable' class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>{log_rows}</tbody></table></div>
+      </div>
+      <div class='mt-3'>
+        <div class='d-flex justify-content-between align-items-center flex-wrap gap-2'>
+          <h6 style='color:white;margin:0'>QA/AHT/Attendance History - Previous</h6>
+          <input id='perfSearch' class='form-control form-control-sm' placeholder='Search previous...' style='width:220px'>
+        </div>
+        <small style='color:#94a3b8'>Search previous performance</small>
+        <div class='table-responsive mt-2'><table id='perfTable' class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>{perf_rows}</tbody></table></div>
+      </div>
+      <script>
+      document.addEventListener('DOMContentLoaded', function(){{
+        var ot=document.getElementById('otSearch'); if(ot){{ot.addEventListener('keyup',function(){{var q=this.value.toLowerCase(); document.querySelectorAll('#otTable tbody tr').forEach(function(r){{r.style.display=r.innerText.toLowerCase().includes(q)?'':'none';}});}});}}
+        var pf=document.getElementById('perfSearch'); if(pf){{pf.addEventListener('keyup',function(){{var q=this.value.toLowerCase(); document.querySelectorAll('#perfTable tbody tr').forEach(function(r){{r.style.display=r.innerText.toLowerCase().includes(q)?'':'none';}});}});}}
+      }});
+      </script>
+      """
     else:
         html+=f"<div class='card-dark mt-3'><h6 style='color:#94a3b8'>View Only - Agent Mode</h6><small style='color:#64748b'>CSAT {lc}% | FCR {lf}% | Risk {risk}</small></div>"
     html+="</div>"
