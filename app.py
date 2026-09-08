@@ -258,6 +258,12 @@ def logout():
     return redirect("/login")
 
 
+def parse_date(dstr):
+    try:
+        return datetime.strptime(dstr, "%Y-%m-%d")
+    except:
+        return None
+
 def get_filtered_stats(period, year, month, quarter, week):
     ot_logs=get_all_ot_logs()
     perf_logs=get_all_perf_logs()
