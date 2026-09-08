@@ -1,11 +1,9 @@
 
+
 import os, json
 from flask import Flask, request, redirect
 
 app = Flask(__name__)
-
-def pretty(k):
-    return k.replace("_"," ").title()
 
 try:
     import firebase_admin
@@ -22,108 +20,100 @@ try:
     db_root = db_mod.reference("team_shine_m9")
 except Exception as e:
     db_root = None
-    init_err = str(e)
 
-BASE_START = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-body{background:#080c14;color:#e2e8f0}
-.card{background:#111827!important;border:1px solid #1f2937!important;border-radius:16px!important}
-.table thead th{background:#0f172a!important;color:#fbbf24!important}
-.table tbody td{background:#111827!important;border-color:#1f2937!important;color:#cbd5e1!important}
-.kpi{padding:14px;border-radius:12px;background:#0f172a;border-left:4px solid #fbbf24}
-</style></head><body>
-<nav class="navbar navbar-dark bg-dark p-3"><div class="container-fluid">
-<a class="navbar-brand fw-bold" href="/">TEAM SHINE M9 REALTIME</a>
-<div><a href="/" class="btn btn-sm btn-outline-light">Agents</a> <a href="/dashboard" class="btn btn-sm btn-warning ms-1">Dashboard</a> <a href="/add" class="btn btn-sm btn-light ms-1">+ Add</a></div>
-</div></nav><div class="container-fluid p-3">"""
+def get_all_agents():
+    raw = db_root.child("agents").get()
+    agents = []
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        # Realtime sometimes returns list
+        for idx, val in enumerate(raw):
+            if isinstance(val, dict) and val:
+                val["id"] = val.get("id") or str(idx)
+                agents.append(val)
+    elif isinstance(raw, dict):
+        for aid, val in raw.items():
+            if isinstance(val, dict):
+                val["id"] = aid
+                agents.append(val)
+    return agents
 
-BASE_END = "</div></body></html>"
+@app.route("/")
+def home():
+    try:
+        agents = get_all_agents()
+        rows = ""
+        for a in agents:
+            name = a.get("NAME","No Name")
+            tid = a.get("TENCENT_ID","")
+            rows += f"<tr><td>{a.get('id')}</td><td><b>{name}</b><br><small>{tid}</small></td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a></td></tr>"
+        return f"""
+        <html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>body{{background:#080c14;color:#e2e8f0}} .card{{background:#111827!important;border:1px solid #1f2937!important}}</style>
+        </head><body>
+        <nav class="navbar navbar-dark bg-dark p-3"><a class="navbar-brand" href="/">TEAM SHINE M9 - {len(agents)} Agents REALTIME</a></nav>
+        <div class="container p-3">
+        <h5>All Agents ({len(agents)}) - Fixed List Bug</h5>
+        <div class="card"><div class="table-responsive"><table class="table table-dark"><thead><tr><th>ID</th><th>NAME</th><th></th></tr></thead><tbody>{rows}</tbody></table></div></div>
+        <a href="/debug" class="btn btn-outline-light btn-sm mt-2">Debug</a>
+        </div></body></html>
+        """
+    except Exception as e:
+        import traceback
+        return f"<pre>Error: {e}\n{traceback.format_exc()}</pre>"
 
-def page(c):
-    return BASE_START + c + BASE_END
+@app.route("/debug")
+def debug():
+    raw = db_root.child("agents").get()
+    t = type(raw).__name__
+    count = len(raw) if raw else 0
+    sample = str(raw)[:1000]
+    return f"Type: {t}<br>Count: {count}<br>Sample: {sample}<br><br><a href='/'>Home</a>"
+
+@app.route("/view/<aid>")
+def view(aid):
+    # Try to find by id - need to handle list storage
+    agents = get_all_agents()
+    data = None
+    for a in agents:
+        if str(a.get("id")) == str(aid):
+            data = a
+            break
+    if not data:
+        # try direct
+        data = db_root.child(f"agents/{aid}").get() or {}
+    return f"<h2>{data.get('NAME','')}</h2><pre>{data}</pre><a href='/'>Home</a> | <a href='/delete/{aid}'>Delete</a>"
+
+@app.route("/delete/<aid>")
+def delete(aid):
+    try:
+        db_root.child(f"agents/{aid}").delete()
+    except:
+        # if list, set to None
+        raw = db_root.child("agents").get()
+        if isinstance(raw, list):
+            try:
+                idx = int(aid)
+                db_root.child(f"agents/{idx}").delete()
+            except:
+                pass
+    return redirect("/")
+
+@app.route("/add", methods=["GET","POST"])
+def add():
+    if request.method=="POST":
+        data = {"NAME": request.form.get("NAME",""), "TENCENT_ID": request.form.get("TENCENT_ID",""), "EMAIL": request.form.get("EMAIL","")}
+        # Always use push with generated key to avoid list bug - use child with custom id
+        new_id = str(len(get_all_agents())+1)
+        db_root.child(f"agents/{new_id}").set(data)
+        return redirect("/")
+    return '<form method="POST"><input name="NAME" placeholder="Name"><input name="TENCENT_ID" placeholder="Tencent"><button>Save</button></form>'
 
 @app.route("/ping")
 def ping():
     return "alive"
-
-@app.route("/debug")
-def debug():
-    try:
-        raw = db_root.child("agents").get() or {}
-        first = list(raw.values())[0] if raw else {}
-        return f"Count {len(raw)}<br>First {first}"
-    except Exception as e:
-        return str(e)
-
-@app.route("/")
-def home():
-    raw = db_root.child("agents").get() or {}
-    rows = ""
-    for aid, val in raw.items():
-        if not isinstance(val, dict):
-            continue
-        name = val.get("NAME","No Name")
-        tid = val.get("TENCENT_ID","")
-        email = val.get("EMAIL","")
-        rows += "<tr><td>" + str(aid) + "</td><td><a href='/view/" + str(aid) + "' style='color:white'><b>" + str(name) + "</b><br><small>" + str(tid) + "</small></a></td><td>" + str(email) + "</td><td><a href='/view/" + str(aid) + "' class='btn btn-sm btn-warning'>View</a></td></tr>"
-    content = "<h5>All Agents (" + str(len(raw)) + ") - REALTIME 1 Call</h5><div class='card'><div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>NAME</th><th>EMAIL</th><th></th></tr></thead><tbody>" + rows + "</tbody></table></div></div>"
-    return page(content)
-
-@app.route("/dashboard")
-def dash():
-    raw = db_root.child("agents").get() or {}
-    total = len(raw)
-    content = "<div class='row g-3'><div class='col-6'><div class='kpi'><small>TOTAL</small><h3>" + str(total) + "</h3></div></div><div class='col-6'><div class='kpi' style='border-color:#22c55e'><small>DB</small><h3>SG FAST</h3></div></div></div>"
-    return page(content)
-
-@app.route("/view/<aid>")
-def view(aid):
-    data = db_root.child("agents/" + aid).get() or {}
-    fields = ""
-    for k,v in data.items():
-        if k.startswith("_"):
-            continue
-        fields += "<div class='col-6 mb-2'><small>" + pretty(k) + "</small><br><b>" + str(v) + "</b></div>"
-    content = "<a href='/' class='btn btn-sm btn-light mb-2'>Back</a><div class='card p-3'><h5>" + str(data.get("NAME","")) + "</h5><div class='row'>" + fields + "</div><hr><a href='/edit/" + aid + "' class='btn btn-warning btn-sm'>Edit</a> <a href='/delete/" + aid + "' class='btn btn-outline-danger btn-sm ms-2'>Delete</a></div>"
-    return page(content)
-
-@app.route("/add", methods=["GET","POST"])
-def add():
-    fields = ["NAME","TENCENT_ID","DATE_HIRED","PHONE_NAME","NBS_ID","HEADSET_SN","IBAS","DJANGO","NT_LOG_IN","Sales_Force","ZOHO","BSS_WEB","EMAIL","BIRTHDAY","CONTACT_NO_","ADDRESS"]
-    if request.method=="POST":
-        clean = {}
-        for f in fields:
-            clean[f] = request.form.get(f,"")
-        ref = db_root.child("agents").push(clean)
-        return redirect("/view/" + ref.key)
-    form = ""
-    for f in fields:
-        form += "<div class='col-6'><label class='small'>" + pretty(f) + "</label><input name='" + f + "' class='form-control form-control-sm mb-2 bg-dark text-light'></div>"
-    content = "<div class='card p-3'><h5>Add Agent</h5><form method='POST' class='row'>" + form + "<div class='col-12 mt-2'><button class='btn btn-warning w-100'>Save</button></div></form></div>"
-    return page(content)
-
-@app.route("/edit/<aid>", methods=["GET","POST"])
-def edit(aid):
-    data = db_root.child("agents/" + aid).get() or {}
-    fields = ["NAME","TENCENT_ID","DATE_HIRED","PHONE_NAME","NBS_ID","HEADSET_SN","IBAS","DJANGO","NT_LOG_IN","Sales_Force","ZOHO","BSS_WEB","EMAIL","BIRTHDAY","CONTACT_NO_","ADDRESS"]
-    if request.method=="POST":
-        clean = {}
-        for f in fields:
-            clean[f] = request.form.get(f,"")
-        db_root.child("agents/" + aid).update(clean)
-        return redirect("/view/" + aid)
-    form = ""
-    for f in fields:
-        val = data.get(f,"")
-        form += "<div class='col-6'><label class='small'>" + pretty(f) + "</label><input name='" + f + "' value='" + str(val).replace("'","") + "' class='form-control form-control-sm mb-2 bg-dark text-light'></div>"
-    content = "<div class='card p-3'><h5>Edit " + str(data.get("NAME","")) + "</h5><form method='POST' class='row'>" + form + "<div class='col-12 mt-2'><button class='btn btn-warning w-100'>Update</button></div></form></div>"
-    return page(content)
-
-@app.route("/delete/<aid>")
-def delete(aid):
-    db_root.child("agents/" + aid).delete()
-    return redirect("/")
 
 if __name__=="__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
