@@ -103,6 +103,54 @@ def get_all_perf():
     except:
         return []
 
+def get_all_announcements():
+    try:
+        raw = db_root.child("announcements").get() if db_root else None
+        if not raw:
+            return []
+        res=[]
+        if isinstance(raw, dict):
+            for aid, val in raw.items():
+                if isinstance(val, dict):
+                    val["id"]=aid
+                    res.append(val)
+        elif isinstance(raw, list):
+            for idx, val in enumerate(raw):
+                if isinstance(val, dict) and val:
+                    val["id"]=str(val.get("id") or idx)
+                    res.append(val)
+        # Sort by date desc
+        res.sort(key=lambda x: x.get("created_at",""), reverse=True)
+        return res
+    except:
+        return []
+
+def get_announcement_reads():
+    try:
+        raw = db_root.child("announcement_reads").get() if db_root else None
+        if not raw:
+            return []
+        res=[]
+        if isinstance(raw, dict):
+            for rid, val in raw.items():
+                if isinstance(val, dict):
+                    val["id"]=rid
+                    res.append(val)
+        return res
+    except:
+        return []
+
+def get_reads_for_announcement(ann_id):
+    reads=get_announcement_reads()
+    return [r for r in reads if str(r.get("announcement_id"))==str(ann_id)]
+
+def has_read(ann_id, agent_id):
+    reads=get_announcement_reads()
+    for r in reads:
+        if str(r.get("announcement_id"))==str(ann_id) and str(r.get("agent_id"))==str(agent_id):
+            return True
+    return False
+
 def calc(logs):
     try:
         n=sum(float(l.get("hours",0)) for l in logs if l.get("type")=="NORMAL_OT")
@@ -250,9 +298,11 @@ input,select{background:var(--card2)!important;color:var(--text)!important;borde
     <li><a class="dropdown-item" href="/working_hours" style="color:var(--text)">⏱️ Working Hours - 220h</a></li>
     <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
     <li><h6 class="dropdown-header" style="color:#22c55e">📊 Export & Reports</h6></li>
+    <li><a class="dropdown-item" href="/announcements" style="color:var(--text)">📢 Announcements - TL Post + Agent Confirm</a></li>
     <li><a class="dropdown-item" href="/export" style="color:var(--text)">📊 Export Excel - QA AHT Attendance</a></li>
     <li><a class="dropdown-item" href="/export/csv" style="color:var(--text)">📥 Export CSV</a></li>
     <li><a class="dropdown-item" href="/export/excel" style="color:var(--text)">📊 Download Excel</a></li>
+    <li><a class="dropdown-item" href="/export/pdf" style="color:var(--text)">📄 Executive Report PDF + Graphs</a></li>
     <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
     <li><h6 class="dropdown-header" style="color:#8b5cf6">⚙️ Settings</h6></li>
     <li><a class="dropdown-item" href="/change_password" style="color:var(--text)">🔑 Change Password</a></li>
@@ -1182,6 +1232,156 @@ def delete_avatar(aid):
     return redirect(f"/view/{aid}")
 
 
+
+@app.route("/announcements")
+@login_required
+def announcements_page():
+    if session.get("role")=="agent":
+        # Agent sees announcements
+        anns=get_all_announcements()
+        agent_id=session.get("agent_id")
+        html_cards=""
+        for ann in anns:
+            read=has_read(ann.get("id"), agent_id)
+            reads=get_reads_for_announcement(ann.get("id"))
+            read_status=f"<span class='badge bg-success'>✅ Nabasa mo na - {ann.get('read_count', len(reads))} reads</span>" if read else f"<span class='badge bg-warning'>⚠️ Hindi pa nabasa</span> <a href='/confirm_announcement/{ann.get('id')}' class='btn btn-sm btn-success'>✅ Confirm na Nabasa Ko</a>"
+            important_badge="<span class='badge bg-danger'>🔴 IMPORTANT</span>" if ann.get("important")=="true" or ann.get("important")==True else ""
+            html_cards+=f"""
+            <div class='card-dark mt-2' style='border:2px solid {"#ef4444" if important_badge else "#fbbf24"}'>
+              <div class='d-flex justify-content-between'><h6 style='color:var(--text)'>{ann.get('title','No Title')} {important_badge}</h6><small style='color:var(--text2)'>{ann.get('created_at','')}</small></div>
+              <p style='color:var(--text);margin:8px 0'>{ann.get('message','')}</p>
+              <div class='d-flex justify-content-between align-items-center'><small style='color:var(--text2)'>By: {ann.get('created_by','TL')} | {len(reads)} agents confirmed</small>{read_status}</div>
+            </div>
+            """
+        if not html_cards:
+            html_cards="<div class='card-dark mt-3'><p style='color:var(--text2);text-align:center'>No announcements - Wala pang announcement si TL</p></div>"
+        return page(f"<h5 style='color:var(--text)'>📢 Announcements - Important Reminders para sa Agent</h5>{html_cards}<div class='mt-3'><a href='/view/{agent_id}' class='btn btn-sm btn-outline-light'>Back to My Dashboard</a></div>")
+    # TL view - manage announcements
+    anns=get_all_announcements()
+    agents=get_all()
+    reads=get_announcement_reads()
+    rows=""
+    for ann in anns:
+        ann_reads=get_reads_for_announcement(ann.get("id"))
+        read_list=""
+        for r in ann_reads:
+            # Find agent name
+            aname=r.get("agent_name","")
+            if not aname:
+                for a in agents:
+                    if str(a.get("id"))==str(r.get("agent_id")):
+                        aname=a.get("NAME","")
+                        break
+            read_list+=f"<span class='badge bg-success' style='margin:2px'>{aname} ✅ {r.get('read_at','')[:10]}</span> "
+        if not read_list:
+            read_list="<small style='color:var(--text2)'>Wala pang nag confirm - 0 reads</small>"
+        important_badge="<span class='badge bg-danger'>IMPORTANT</span>" if ann.get("important")=="true" or ann.get("important")==True else ""
+        rows+=f"""
+        <div class='card-dark mt-2' style='border:1px solid #334155'>
+          <div class='d-flex justify-content-between'><h6 style='color:var(--text)'>{ann.get('title','')} {important_badge}</h6><div><small style='color:var(--text2)'>{ann.get('created_at','')}</small> <a href='/delete_announcement/{ann.get('id')}' class='btn btn-sm btn-outline-danger' onclick="return confirm('Delete announcement?')">X</a></div></div>
+          <p style='color:var(--text2);font-size:13px'>{ann.get('message','')}</p>
+          <div><small style='color:var(--text2)'>By: {ann.get('created_by','')} | {len(ann_reads)}/{len(agents)} confirmed reads</small></div>
+          <div class='mt-2'>{read_list}</div>
+        </div>
+        """
+    if not rows:
+        rows="<div class='card-dark mt-3'><p style='color:var(--text2);text-align:center'>No announcements yet - Mag post ka ng important reminder para sa agents!</p></div>"
+    return page(f"""
+    <h5 style='color:var(--text)'>📢 Announcements Management - TL magpopost, Agent kita + Confirm</h5>
+    <div class='card-dark mt-3' style='border:2px solid #fbbf24'>
+      <h6 style='color:#fbbf24'>➕ Mag Post ng Announcement - Important Reminder para sa Agents</h6>
+      <form method='POST' action='/add_announcement' class='row g-2 mt-2'>
+        <div class='col-12 col-md-8'><label class='label'>Title *</label><input name='title' class='form-control form-control-sm' placeholder='Ex: Important Meeting Bukas 9AM, New QA Guidelines, etc.' required></div>
+        <div class='col-12 col-md-4'><label class='label'>Important?</label><select name='important' class='form-select form-select-sm'><option value='false'>Normal</option><option value='true'>🔴 Important - Red Border</option></select></div>
+        <div class='col-12'><label class='label'>Message * - Important Reminder</label><textarea name='message' class='form-control form-control-sm' rows='3' placeholder='Ex: Lahat ng agents need umattend ng meeting bukas 9AM sa conference room. Bring your QA reports. Important! - TL' required></textarea></div>
+        <div class='col-12'><button class='btn btn-warning w-100'>📢 Post Announcement - Kita sa UI ng mga Agent + May Confirm</button></div>
+      </form>
+    </div>
+    <div class='mt-4'><h6 style='color:var(--text)'>All Announcements ({len(anns)}) - May Confirm para alam ni TL na nabasa</h6>{rows}</div>
+    <div class='mt-3'><a href='/' class='btn btn-sm btn-outline-light'>Back to Dashboard</a></div>
+    """)
+
+@app.route("/add_announcement", methods=["POST"])
+@login_required
+def add_announcement():
+    if session.get("role")=="agent":
+        return redirect("/announcements")
+    try:
+        title=request.form.get("title","").strip()
+        message=request.form.get("message","").strip()
+        important=request.form.get("important","false")
+        if not title or not message:
+            return redirect("/announcements")
+        if db_root:
+            import uuid
+            ann_id=str(uuid.uuid4())[:8]
+            db_root.child(f"announcements/{ann_id}").set({
+                "id": ann_id,
+                "title": title,
+                "message": message,
+                "important": important,
+                "created_by": session.get("name","TL"),
+                "created_by_id": session.get("user",""),
+                "created_at": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p"),
+                "date": datetime.now(PH_TZ).strftime("%Y-%m-%d")
+            })
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": session.get("role"),"type": f"ADD_ANNOUNCEMENT {title}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": "ALL"})
+            except:
+                pass
+    except Exception as e:
+        print(f"add_announcement error: {e}")
+        traceback.print_exc()
+    return redirect("/announcements")
+
+@app.route("/delete_announcement/<ann_id>")
+@login_required
+def delete_announcement(ann_id):
+    if session.get("role")=="agent":
+        return redirect("/announcements")
+    try:
+        if db_root:
+            db_root.child(f"announcements/{ann_id}").delete()
+            # Also delete reads
+            reads=get_announcement_reads()
+            for r in reads:
+                if str(r.get("announcement_id"))==str(ann_id):
+                    db_root.child(f"announcement_reads/{r.get('id')}").delete()
+    except:
+        pass
+    return redirect("/announcements")
+
+@app.route("/confirm_announcement/<ann_id>")
+@login_required
+def confirm_announcement(ann_id):
+    try:
+        agent_id=session.get("agent_id") or session.get("user")
+        agent_name=session.get("name") or session.get("user")
+        if not agent_id:
+            return redirect("/announcements")
+        # Check if already read
+        if has_read(ann_id, agent_id):
+            return redirect("/announcements")
+        if db_root:
+            import uuid
+            read_id=str(uuid.uuid4())[:8]
+            db_root.child(f"announcement_reads/{read_id}").set({
+                "id": read_id,
+                "announcement_id": ann_id,
+                "agent_id": agent_id,
+                "agent_name": agent_name,
+                "read_at": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p"),
+                "date": datetime.now(PH_TZ).strftime("%Y-%m-%d")
+            })
+            try:
+                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": session.get("role"),"type": f"CONFIRM_ANNOUNCEMENT {ann_id}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": agent_id})
+            except:
+                pass
+    except Exception as e:
+        print(f"confirm_announcement error: {e}")
+    return redirect("/announcements")
+
+
 @app.route("/export")
 @login_required
 def export_page():
@@ -1327,6 +1527,214 @@ def export_excel():
         print(f"export_excel error: {e}")
         traceback.print_exc()
         return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Export Error</h6><pre style='color:#fbbf24;font-size:10px'>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+
+
+@app.route("/export/pdf")
+@login_required
+def export_pdf():
+    try:
+        agents=get_all()
+        ot_logs=get_all_ot()
+        perf_logs=get_all_perf()
+        anns=get_all_announcements()
+        reads=get_announcement_reads()
+        # Calculate TL KPI
+        agent_stats=[]
+        team_n=0; team_r=0; team_loss=0; team_tot=0
+        for a in agents:
+            logs=get_ot(a.get("id"))
+            n,r,tot,loss,net=calc(logs)
+            team_n+=n; team_r+=r; team_loss+=loss; team_tot+=tot
+            plogs=get_perf(a.get("id"))
+            la,lq,lc,lf,aa,qa,ac,af=calc_perf(plogs)
+            wh_target=float(a.get("WORKING_HOURS_TARGET", a.get("WORKING HOURS TARGET", 220)))
+            wh_actual=wh_target-loss
+            wh_comp=(wh_actual/wh_target*100) if wh_target>0 else 0
+            agent_stats.append({"name":a.get("NAME",""),"tid":a.get("TENCENT ID") or a.get("TENCENT_ID",""),"tot":tot,"loss":loss,"net":net,"aht":la,"qa":lq,"csat":lc,"fcr":lf,"wh_target":wh_target,"wh_actual":wh_actual,"wh_comp":wh_comp})
+        team_qa=[a["qa"] for a in agent_stats if a["qa"]>0]
+        team_aht=[a["aht"] for a in agent_stats if a["aht"]>0]
+        team_csat=[a["csat"] for a in agent_stats if a["csat"]>0]
+        team_fcr=[a["fcr"] for a in agent_stats if a["fcr"]>0]
+        total_wh=sum([a["wh_target"] for a in agent_stats])
+        total_actual=total_wh-team_loss
+        overall_att=(total_actual/total_wh*100) if total_wh>0 else 0
+        avg_qa=round(sum(team_qa)/len(team_qa),1) if team_qa else 0
+        avg_aht=round(sum(team_aht)/len(team_aht),1) if team_aht else 0
+        avg_csat=round(sum(team_csat)/len(team_csat),1) if team_csat else 0
+        avg_fcr=round(sum(team_fcr)/len(team_fcr),1) if team_fcr else 0
+        
+        # Try to generate PDF with reportlab
+        try:
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.lib.units import inch
+            from reportlab.lib.colors import HexColor, white, black
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+            from reportlab.lib import colors
+            from reportlab.graphics.shapes import Drawing
+            from reportlab.graphics.charts.barcharts import VerticalBarChart
+            from reportlab.graphics.charts.linecharts import HorizontalLineChart
+            from io import BytesIO
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            
+            buffer=BytesIO()
+            doc=SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+            styles=getSampleStyleSheet()
+            title_style=ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, spaceAfter=12, textColor=HexColor('#fbbf24'), alignment=1)
+            heading_style=ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=14, spaceAfter=6, textColor=HexColor('#0f172a'))
+            normal_style=styles['Normal']
+            normal_style.fontSize=9
+            
+            story=[]
+            story.append(Paragraph("TEAM SHINE M9 - Executive Report - TL KPI QA AHT ATTENDANCE", title_style))
+            story.append(Paragraph(f"Generated: {datetime.now(PH_TZ).strftime('%Y-%m-%d %I:%M %p')} | Team Leader: {session.get('name','TL')} | Total Agents: {len(agents)}", normal_style))
+            story.append(Spacer(1, 12))
+            
+            # Executive Summary
+            story.append(Paragraph("📊 Executive Summary - Basa sa Data", heading_style))
+            summary_text=f"""
+            <b>Team Overview:</b> Total {len(agents)} agents. Total OT: {round(team_tot,1)}h (Normal: {round(team_n,1)}h, Restday: {round(team_r,1)}h). Total Loss: {round(team_loss,1)}h. Net: {round(team_tot-team_loss,1)}h.<br/>
+            <b>Performance KPI:</b> Team Avg QA: {avg_qa}% ({len(team_qa)} agents), Team Avg AHT: {avg_aht}m ({len(team_aht)} agents), Team Avg CSAT: {avg_csat}%, Team Avg FCR: {avg_fcr}%.<br/>
+            <b>Attendance:</b> Overall Attendance: {round(overall_att,1)}% - Total WH Target: {round(total_wh,1)}h, Actual: {round(total_actual,1)}h, Loss: {round(team_loss,1)}h.<br/>
+            <b>Announcements:</b> Total {len(anns)} announcements posted, {len(reads)} confirmations - {len(agents)} agents, {round(len(reads)/len(anns)/len(agents)*100,1) if anns and agents else 0}% read rate.<br/>
+            <b>Risk:</b> {len([a for a in agent_stats if a['loss']>=4])} agents with Loss >=4h (Critical), {len([a for a in agent_stats if a['qa']>0 and a['qa']<75])} agents with QA <75% (Needs Improvement).
+            """
+            story.append(Paragraph(summary_text, normal_style))
+            story.append(Spacer(1, 12))
+            
+            # TL KPI Table
+            story.append(Paragraph("📊 TL Overall Team KPI - QA, AHT, ATTENDANCE", heading_style))
+            kpi_data=[
+                ["Metric", "Value", "Unit", "Details"],
+                ["Team Avg QA", str(avg_qa), "%", f"{len(team_qa)} agents with QA"],
+                ["Team Avg AHT", str(avg_aht), "minutes", f"{len(team_aht)} agents"],
+                ["Team Avg CSAT", str(avg_csat), "%", f"{len(team_csat)} agents"],
+                ["Team Avg FCR", str(avg_fcr), "%", f"{len(team_fcr)} agents"],
+                ["Team Attendance", str(round(overall_att,1)), "%", f"{round(total_actual,1)}/{round(total_wh,1)}h"],
+                ["Total Normal OT", str(round(team_n,1)), "h", ""],
+                ["Total Restday OT", str(round(team_r,1)), "h", ""],
+                ["Total OT", str(round(team_tot,1)), "h", ""],
+                ["Total Loss", str(round(team_loss,1)), "h", ""],
+                ["Team Net", str(round(team_tot-team_loss,1)), "h", ""],
+            ]
+            t=Table(kpi_data, colWidths=[120, 60, 60, 150])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), HexColor('#fbbf24')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 8),
+                ('BOTTOMPADDING', (0,0), (-1,0), 12),
+                ('BACKGROUND', (0,1), (-1,-1), colors.beige),
+                ('GRID', (0,0), (-1,-1), 1, colors.black)
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 12))
+            
+            # Graphs - create matplotlib charts and add to PDF
+            try:
+                # OT Graph
+                fig, axes=plt.subplots(2, 2, figsize=(8, 6))
+                fig.suptitle('Team OT & Performance Trends')
+                # Get monthly data
+                from collections import defaultdict
+                import calendar
+                m_groups=defaultdict(list)
+                for l in ot_logs:
+                    dt=parse_date(l.get("date",""))
+                    if dt:
+                        m_groups[dt.month].append(l)
+                months=list(range(1,13))
+                normal_m=[]; restday_m=[]; total_m=[]; loss_m=[]
+                for m in months:
+                    n,r,tot,loss,net=calc(m_groups.get(m,[]))
+                    normal_m.append(n); restday_m.append(r); total_m.append(tot); loss_m.append(loss)
+                axes[0,0].plot(months, normal_m, color='#22c55e', marker='o')
+                axes[0,0].set_title('Normal OT Monthly')
+                axes[0,1].plot(months, restday_m, color='#3b82f6', marker='o')
+                axes[0,1].set_title('Restday OT Monthly')
+                axes[1,0].plot(months, total_m, color='#fbbf24', marker='o')
+                axes[1,0].set_title('Total OT Monthly')
+                axes[1,1].plot(months, loss_m, color='#ef4444', marker='o')
+                axes[1,1].set_title('Loss Hrs Monthly')
+                plt.tight_layout()
+                img_buffer=BytesIO()
+                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+                plt.close()
+                img_buffer.seek(0)
+                story.append(Image(img_buffer, width=450, height=300))
+                story.append(Spacer(1, 12))
+                
+                # QA AHT Attendance Graph
+                fig2, axes2=plt.subplots(1, 3, figsize=(8, 3))
+                # QA trend
+                p_groups=defaultdict(list)
+                for l in perf_logs:
+                    dt=parse_date(l.get("date",""))
+                    if dt:
+                        p_groups[dt.month].append(l)
+                qa_m=[]; aht_m=[]; csat_m=[]
+                for m in months:
+                    la,lq,lc,lf,aa,qa,ac,af=calc_perf(p_groups.get(m,[]))
+                    qa_m.append(qa); aht_m.append(aa); csat_m.append(ac)
+                axes2[0].plot(months, qa_m, color='#8b5cf6', marker='o')
+                axes2[0].set_title('QA Trend')
+                axes2[1].plot(months, aht_m, color='#f97316', marker='o')
+                axes2[1].set_title('AHT Trend')
+                axes2[2].plot(months, csat_m, color='#06b6d4', marker='o')
+                axes2[2].set_title('CSAT Trend')
+                plt.tight_layout()
+                img_buffer2=BytesIO()
+                plt.savefig(img_buffer2, format='png', dpi=150, bbox_inches='tight')
+                plt.close()
+                img_buffer2.seek(0)
+                story.append(Image(img_buffer2, width=450, height=150))
+                story.append(Spacer(1, 12))
+            except Exception as e:
+                story.append(Paragraph(f"Graph generation error: {str(e)} - Data: OT {len(ot_logs)} logs, Perf {len(perf_logs)} logs", normal_style))
+            
+            # Agent Detail Table
+            story.append(PageBreak())
+            story.append(Paragraph("👥 Agent Detail - QA, AHT, ATTENDANCE KPI per Agent", heading_style))
+            agent_data=[["ID","NAME","TENCENT_ID","TOTAL_OT","LOSS","NET","AHT","QA","WH_COMP%"]]
+            for a in agent_stats[:20]:  # First 20 for PDF
+                agent_data.append([str(a.get("name",""))[:15], str(a.get("tid","")), str(a.get("tot","")), str(a.get("loss","")), str(a.get("net","")), str(a.get("aht","")), str(a.get("qa","")), str(round(a.get("wh_comp",0),1))+"%"])
+            t2=Table(agent_data, colWidths=[60, 60, 50, 50, 40, 40, 40, 40, 50])
+            t2.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), HexColor('#151e32')),
+                ('TEXTCOLOR', (0,0), (-1,0), HexColor('#fbbf24')),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 7),
+                ('GRID', (0,0), (-1,-1), 1, colors.black)
+            ]))
+            story.append(t2)
+            story.append(Spacer(1, 12))
+            
+            # Announcements Summary
+            story.append(Paragraph("📢 Announcements Summary", heading_style))
+            if anns:
+                for ann in anns[:5]:
+                    reads_for_ann=get_reads_for_announcement(ann.get("id"))
+                    story.append(Paragraph(f"<b>{ann.get('title','')} - {ann.get('created_at','')}</b> - {len(reads_for_ann)}/{len(agents)} confirmed reads<br/>{ann.get('message','')[:200]}", normal_style))
+                    story.append(Spacer(1, 6))
+            else:
+                story.append(Paragraph("No announcements", normal_style))
+            
+            doc.build(story)
+            pdf=buffer.getvalue()
+            buffer.close()
+            return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition":"attachment;filename=Team_Shine_M9_Executive_Report_QA_AHT_ATTENDANCE.pdf"})
+        except ImportError as e:
+            # Fallback if reportlab not available
+            return page(f"<div class='card-dark'><h6 style='color:#ef4444'>PDF Export - Need reportlab & matplotlib</h6><p style='color:var(--text2);font-size:12px'>Error: {str(e)}</p><p style='color:var(--text2)'>Install: pip install reportlab matplotlib</p><pre style='color:#fbbf24;font-size:10px'>pip install reportlab matplotlib openpyxl</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+    except Exception as e:
+        print(f"export_pdf error: {e}")
+        traceback.print_exc()
+        return page(f"<div class='card-dark'><h6 style='color:#ef4444'>PDF Export Error</h6><pre style='color:#fbbf24;font-size:10px'>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+
 
 
 if __name__=="__main__":
