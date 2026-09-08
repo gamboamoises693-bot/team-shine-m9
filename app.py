@@ -57,23 +57,24 @@ BASE_HTML = """<!doctype html><html><head><meta name="viewport" content="width=d
 __REFRESH__
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<title>TEAM SHINE M9 - Firebase</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>TEAM SHINE M9 - Command Center</title>
 <style>
 body{background:#080c14;color:#e2e8f0;font-family:system-ui}
 .navbar{background:#0f172a!important;border-bottom:1px solid #1e293b}
 .card{background:#111827!important;border:1px solid #1f2937!important;border-radius:20px!important}
+.kpi-card{background:linear-gradient(135deg,#111827 0%,#0f172a 100%)!important;border:1px solid #1e293b!important;border-radius:16px!important;padding:18px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent)}
+.kpi-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px}
 .table{color:#e2e8f0!important;margin-bottom:0!important}
 .table thead th{background:#0f172a!important;color:#fbbf24!important;border-bottom:2px solid #fbbf24!important;font-size:11px!important;text-transform:uppercase!important;padding:14px 12px!important;font-weight:800!important}
 .table tbody td{background:#111827!important;border-color:#1f2937!important;padding:14px 12px!important;color:#e2e8f0!important}
-.table tbody tr{background:#111827!important}
-.table tbody tr:nth-child(even){background:#0f172a!important}
-.table tbody tr:nth-child(even) td{background:#0f172a!important}
 .badge-id{background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 10px}
 .btn-exec{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0f172a;font-weight:800;border:none;border-radius:12px;padding:8px 18px}
 .search-box{background:#0f172a;border:1px solid #1f2937;color:white;border-radius:12px;padding:12px}
 .detail-card{background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:14px;height:100%}
 .field-label{color:#64748b;font-size:10px;text-transform:uppercase;font-weight:700;margin-bottom:4px}
-.field-value{color:#f1f5f9;font-weight:600;font-size:13px;word-break:break-word;white-space:normal}
+.field-value{color:#f1f5f9;font-weight:600;font-size:13px;word-break:break-word}
 .agent-avatar{width:80px;height:80px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:900;color:#0f172a}
 .stat-card{background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:16px;text-align:center}
 .stat-value{font-size:28px;font-weight:800}
@@ -84,21 +85,29 @@ body{background:#080c14;color:#e2e8f0;font-family:system-ui}
 .input-dark{background:#0a0e1a!important;border:1px solid #1f2937!important;color:white!important;border-radius:10px!important}
 .agent-name-dark{color:#f1f5f9!important;font-weight:700!important}
 .agent-sub{color:#94a3b8!important;font-weight:400!important;font-size:11px!important}
-.chart-container{position:relative;height:350px!important;width:100%!important}
-.chart-container-small{position:relative;height:220px!important;width:100%!important;display:flex;align-items:center;justify-content:center}
-.chart-container-top10{position:relative;height:300px!important;width:100%!important}
-@media (max-width: 992px){.desktop-grid{grid-template-columns:1fr!important}.agent-sidebar{position:static!important}.ot-loss-grid{grid-template-columns:1fr!important}.chart-container{height:300px!important}}
+.chart-container{position:relative;height:280px!important}
+.nav-pill{padding:8px 16px;border-radius:10px;text-decoration:none;font-size:13px;font-weight:600;color:#94a3b8}
+.nav-pill.active{background:#fbbf24;color:#0f172a}
+.trend-up{color:#22c55e} .trend-down{color:#ef4444}
+@media (max-width: 992px){.desktop-grid{grid-template-columns:1fr!important}.agent-sidebar{position:static!important}.ot-loss-grid{grid-template-columns:1fr!important}}
 </style></head><body>
 <nav class="navbar navbar-dark p-3 sticky-top"><div class="container-fluid d-flex justify-content-between flex-wrap gap-2">
-<a class="navbar-brand fw-bold" href="/"><i class="bi bi-lightning-charge-fill text-warning"></i> TEAM SHINE M9 <span style="font-size:10px" class="badge bg-warning text-dark">FIREBASE</span></a>
-<div class="d-flex gap-2"><a href="/export_csv" class="btn btn-sm btn-outline-warning" style="border-radius:10px"><i class="bi bi-download"></i> CSV</a><a href="/add" class="btn btn-sm btn-warning fw-bold" style="border-radius:10px;color:#0f172a">+ Add Agent</a></div>
+<a class="navbar-brand fw-bold" href="/"><i class="bi bi-lightning-charge-fill text-warning"></i> TEAM SHINE M9 <span style="font-size:10px" class="badge bg-warning text-dark">LIVE</span></a>
+<div class="d-flex gap-2 align-items-center">
+<a href="/" class="nav-pill __HOME_ACTIVE__"><i class="bi bi-people"></i> Agents</a>
+<a href="/dashboard" class="nav-pill __DASH_ACTIVE__"><i class="bi bi-speedometer2"></i> Dashboard</a>
+<a href="/export_csv" class="btn btn-sm btn-outline-warning" style="border-radius:10px"><i class="bi bi-download"></i></a>
+<a href="/add" class="btn btn-sm btn-warning fw-bold" style="border-radius:10px;color:#0f172a">+ Add</a>
+</div>
 </div></nav><div class="container-fluid p-3 p-md-4">
 __CONTENT__
 </div></body></html>"""
 
-def render_page(content, total, refresh_secs=None):
+def render_page(content, total, refresh_secs=None, active='home'):
     refresh = f'<meta http-equiv="refresh" content="{refresh_secs}">' if refresh_secs else ''
     html_page = BASE_HTML.replace("__REFRESH__", refresh).replace("__CONTENT__", content)
+    html_page = html_page.replace("__HOME_ACTIVE__", "active" if active=='home' else "")
+    html_page = html_page.replace("__DASH_ACTIVE__", "active" if active=='dash' else "")
     return html_page
 
 @app.route("/")
@@ -151,7 +160,7 @@ def view(aid):
       </div></div>
     </div>
     """
-    return render_page(content, 0)
+    return render_page(content, 0, active='home')
 
 @app.route("/add", methods=["GET","POST"])
 @app.route("/edit/<aid>", methods=["GET","POST"])
@@ -168,7 +177,7 @@ def add_edit(aid=None):
     f = "".join([f"<div class='col-md-6 mb-3'><label class='field-label'>{esc(c)}</label><input name='{c}' value='{esc(ag.get(c,'')) if ag else ''}' class='form-control input-dark'></div>" for c in COLS])
     title="Edit Agent" if aid else "Add Agent"
     content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>Back</a><div class='card p-4'><h4 class='fw-bold'>{title}</h4><form method='post' class='row'>{f}<div class='col-12 mt-3'><button class='btn btn-warning fw-bold'>Save</button></div></form></div>"
-    return render_page(content, 0)
+    return render_page(content, 0, active='home')
 
 @app.route("/add_ot/<aid>", methods=["POST"])
 def add_ot(aid):
@@ -855,6 +864,136 @@ MIGRATE_OT_LOGS = [
     "created_at": "2026-09-07 17:38:45"
   }
 ]
+
+
+@app.route("/dashboard")
+def dashboard():
+    agents = get_all_agents()
+    total = len(agents)
+    
+    # calc metrics
+    from collections import Counter, defaultdict
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    this_month = now.strftime("%Y-%m")
+    
+    ot_total = 0
+    loss_total = 0
+    ot_by_agent = {}
+    loss_by_agent = {}
+    ot_daily = defaultdict(float)
+    new_hires = 0
+    
+    for a in agents:
+        aid = a['id']
+        # check date hired
+        dh = a.get('DATE HIRED','')
+        if this_month in str(dh) or now.strftime("%Y-%m") in str(dh) or str(now.year) in str(dh) and str(now.month) in str(dh):
+            # simple: if hired 2026-05 etc
+            pass
+        # OT
+        ot_sum = 0
+        for d in db.collection('agents').document(aid).collection('ot_logs').stream():
+            h = float(d.to_dict().get('hours',0) or 0)
+            ot_sum+=h
+            ot_total+=h
+            dt = d.to_dict().get('ot_date','')
+            if dt:
+                ot_daily[dt]+=h
+        ot_by_agent[a.get('NAME','')] = ot_sum
+        
+        # LOSS (if exists)
+        loss_sum = 0
+        try:
+            for d in db.collection('agents').document(aid).collection('loss_logs').stream():
+                h = float(d.to_dict().get('hours',0) or 0)
+                loss_sum+=h
+                loss_total+=h
+        except:
+            pass
+        loss_by_agent[a.get('NAME','')] = loss_sum
+        
+        # new hire check (last 30 days)
+        try:
+            if a.get('DATE HIRED'):
+                hired = datetime.strptime(str(a.get('DATE HIRED'))[:10], "%Y-%m-%d")
+                if (now - hired).days <= 30:
+                    new_hires+=1
+        except:
+            pass
+    
+    # attendance = 100 - (loss_total / (total*8*22) *100) simplified
+    attendance_rate = 100
+    if total>0:
+        possible_hours = total * 8 * 22
+        if possible_hours>0:
+            attendance_rate = max(0, 100 - (loss_total / possible_hours * 100))
+    
+    top_ot = sorted(ot_by_agent.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_loss = sorted(loss_by_agent.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    # prepare chart data
+    dates = sorted(ot_daily.keys())[-7:]  # last 7 dates with OT
+    ot_values = [ot_daily[d] for d in dates]
+    
+    content = f"""
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div><h4 class="fw-bold mb-0">Command Center</h4><small class="text-muted">Call Center KPI - Team Shine M9 | {now.strftime('%B %Y')}</small></div>
+      <div class="d-flex gap-2"><span class="badge bg-success">LIVE FIREBASE</span><span class="badge bg-dark border">{total} Agents</span></div>
+    </div>
+    
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3"><div class="kpi-card" style="--accent:#fbbf24"><div class="d-flex justify-content-between"><div><div class="text-muted" style="font-size:11px">TOTAL HEADCOUNT</div><div class="fs-3 fw-bold">{total}</div><small class="trend-up"><i class="bi bi-arrow-up"></i> {new_hires} new hires (30d)</small></div><div class="kpi-icon" style="background:#fbbf241a;color:#fbbf24"><i class="bi bi-people-fill"></i></div></div></div></div>
+      <div class="col-6 col-lg-3"><div class="kpi-card" style="--accent:#22c55e"><div class="d-flex justify-content-between"><div><div class="text-muted" style="font-size:11px">ATTENDANCE RATE</div><div class="fs-3 fw-bold">{attendance_rate:.1f}%</div><small class="{'trend-down' if loss_total>10 else 'trend-up'}">{loss_total:.1f}h LOSS this month</small></div><div class="kpi-icon" style="background:#22c55e1a;color:#22c55e"><i class="bi bi-check-circle"></i></div></div></div></div>
+      <div class="col-6 col-lg-3"><div class="kpi-card" style="--accent:#3b82f6"><div class="d-flex justify-content-between"><div><div class="text-muted" style="font-size:11px">TOTAL OT HOURS</div><div class="fs-3 fw-bold">{ot_total:.1f}h</div><small class="text-muted">{len(dates)} days with OT</small></div><div class="kpi-icon" style="background:#3b82f61a;color:#3b82f6"><i class="bi bi-clock-history"></i></div></div></div></div>
+      <div class="col-6 col-lg-3"><div class="kpi-card" style="--accent:#ef4444"><div class="d-flex justify-content-between"><div><div class="text-muted" style="font-size:11px">SHRINKAGE / LOSS</div><div class="fs-3 fw-bold">{loss_total:.1f}h</div><small class="trend-down">{(loss_total/(ot_total+1)*100):.0f}% vs OT</small></div><div class="kpi-icon" style="background:#ef44441a;color:#ef4444"><i class="bi bi-exclamation-triangle"></i></div></div></div></div>
+    </div>
+    
+    <div class="row g-3 mb-4">
+      <div class="col-lg-8"><div class="card p-3"><h6 class="fw-bold mb-3"><i class="bi bi-graph-up text-warning"></i> OT Trend (Last 7 Days)</h6><div class="chart-container"><canvas id="otChart"></canvas></div></div></div>
+      <div class="col-lg-4"><div class="card p-3 h-100"><h6 class="fw-bold mb-3"><i class="bi bi-pie-chart text-warning"></i> Workload Distribution</h6><div class="chart-container"><canvas id="distChart"></canvas></div>
+      <div class="mt-3 small text-muted">Call Center Standard: OT should be <10% of total hours. Current OT ratio helps track burnout risk.</div>
+      </div></div>
+    </div>
+    
+    <div class="row g-3 mb-4">
+      <div class="col-lg-6"><div class="card p-3"><h6 class="fw-bold">🏆 Top 5 OT - Overtime Heroes</h6><p class="text-muted small">Monitor for burnout - best for incentives</p><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Agent</th><th>Hours</th><th>Risk</th></tr></thead><tbody>
+        {''.join([f"<tr><td>{esc(name)}</td><td><span class='badge bg-warning text-dark'>{h:.1f}h</span></td><td>{'<span class=text-danger>High</span>' if h>20 else '<span class=text-warning>Medium</span>' if h>10 else '<span class=text-success>OK</span>'}</td></tr>" for name,h in top_ot])}
+      </tbody></table></div></div></div>
+      <div class="col-lg-6"><div class="card p-3"><h6 class="fw-bold">⚠️ Top 5 LOSS - Attendance Coaching Needed</h6><p class="text-muted small">For 1-on-1 coaching & NTE tracking</p><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Agent</th><th>Loss Hours</th><th>Action</th></tr></thead><tbody>
+        {''.join([f"<tr><td>{esc(name)}</td><td><span class='badge bg-danger'>{h:.1f}h</span></td><td>{'Coaching' if h>0 else 'Good'}</td></tr>" for name,h in top_loss]) if any(h>0 for _,h in top_loss) else "<tr><td colspan=3 class='text-center text-success'>No LOSS - Excellent attendance!</td></tr>"}
+      </tbody></table></div></div></div>
+    </div>
+    
+    <div class="card p-3"><h6 class="fw-bold"><i class="bi bi-lightbulb text-warning"></i> Call Center Manager Recommendations</h6>
+    <div class="row g-2 mt-2">
+      <div class="col-md-4"><div class="detail-card"><strong>For BPO KPI:</strong><br><small>• AHT Target: Track via ZOHO/BSS<br>• CSAT: Integrate survey<br>• Attendance Goal: >95% (You: {attendance_rate:.1f}%)<br>• OT Limit: Max 20h/month/agent</small></div></div>
+      <div class="col-md-4"><div class="detail-card"><strong>Suggested Next Features:</strong><br><small>• Daily Scorecard per agent<br>• Auto NTE generator for LOSS >3<br>• Birthday & Tenure alerts<br>• Shift schedule vs OT validation</small></div></div>
+      <div class="col-md-4"><div class="detail-card"><strong>Current Health:</strong><br><small>• Total HC: {total}<br>• Net OT: {ot_total-loss_total:.1f}h<br>• Burnout Risk: {len([h for _,h in top_ot if h>20])} agents >20h OT<br>• Coaching Needed: {len([h for _,h in top_loss if h>0])} agents</small></div></div>
+    </div></div>
+    
+    <script>
+    const otCtx = document.getElementById('otChart');
+    new Chart(otCtx, {{
+      type: 'bar',
+      data: {{
+        labels: {json.dumps(dates)},
+        datasets: [{{label: 'OT Hours', data: {json.dumps(ot_values)}, backgroundColor: '#fbbf24', borderRadius: 8}}]
+      }},
+      options: {{responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{y:{{beginAtZero:true, grid:{{color:'#1e293b'}}}}, x:{{grid:{{display:false}}}}}} }}
+    }});
+    const distCtx = document.getElementById('distChart');
+    new Chart(distCtx, {{
+      type: 'doughnut',
+      data: {{
+        labels: ['OT Hours', 'Loss Hours', 'Regular'],
+        datasets: [{{data: [{ot_total}, {loss_total}, {max(0, total*176 - ot_total - loss_total)}], backgroundColor: ['#fbbf24','#ef4444','#1e293b']}}]
+      }},
+      options: {{responsive:true, maintainAspectRatio:false, plugins:{{legend:{{position:'bottom', labels:{{color:'#94a3b8'}}}}}}}}
+    }});
+    </script>
+    """
+    return render_page(content, total, active='dash')
 
 @app.route("/migrate")
 def migrate():
