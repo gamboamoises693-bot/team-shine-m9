@@ -142,7 +142,7 @@ input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px sol
 <a href="/export" class="btn btn-sm btn-outline-light">📥</a>
 <a href="/bulk" class="btn btn-sm btn-outline-light">📤</a>
 <a href="/logs" class="btn btn-sm btn-outline-light">📋 Logs</a> <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> 
-<a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
+<a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a> <a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
 </div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
 <script>
@@ -719,6 +719,123 @@ def login_logs():
     return page(html)
 
 
+
+@app.route("/change_password", methods=["GET","POST"])
+@login_required
+def change_password():
+    msg=""
+    color="#22c55e"
+    if request.method=="POST":
+        current=request.form.get("current","")
+        new=request.form.get("new","")
+        confirm=request.form.get("confirm","")
+        if new!=confirm:
+            msg="New password and confirm do not match!"
+            color="#ef4444"
+        else:
+            # For admin users
+            if session.get("role") in ["admin","team_leader","qa"]:
+                u=session.get("user")
+                if USERS.get(u) and USERS[u]["pass"]!=current and session.get("role")!="admin":
+                    msg="Current password incorrect!"
+                    color="#ef4444"
+                else:
+                    # Allow admin to change without current check if they want? For simplicity check
+                    if session.get("role")=="admin" or USERS.get(u,{}).get("pass")==current:
+                        USERS[u]["pass"]=new
+                        msg=f"Password updated for {u}!"
+                        if db_root:
+                            try:
+                                db_root.child("login_logs").push({
+                                    "user": u,
+                                    "name": session.get("name",""),
+                                    "role": session.get("role",""),
+                                    "type": "PASSWORD_CHANGE",
+                                    "timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),
+                                    "date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),
+                                    "agent_id": "ADMIN"
+                                })
+                            except: pass
+                    else:
+                        msg="Current password incorrect!"
+                        color="#ef4444"
+            else:
+                # Agent
+                aid=session.get("agent_id")
+                agents=get_all()
+                agent=None
+                for a in agents:
+                    if str(a.get("id"))==str(aid):
+                        agent=a
+                        break
+                if agent:
+                    stored=str(agent.get("LOGIN_PASS") or agent.get("TENCENT_ID") or "1234")
+                    if current!=stored:
+                        msg="Current password incorrect! Default is your Tencent ID"
+                        color="#ef4444"
+                    else:
+                        if db_root:
+                            db_root.child(f"agents/{aid}/LOGIN_PASS").set(new)
+                            msg="Password updated successfully!"
+                            try:
+                                db_root.child("login_logs").push({
+                                    "user": agent.get("TENCENT_ID"),
+                                    "name": agent.get("NAME"),
+                                    "role": "agent",
+                                    "type": "PASSWORD_CHANGE",
+                                    "timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),
+                                    "date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),
+                                    "agent_id": aid
+                                })
+                            except: pass
+                else:
+                    msg="Agent not found"
+                    color="#ef4444"
+    is_agent=session.get("role")=="agent"
+    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back Dashboard</a><div class='card-dark' style='max-width:500px;margin:auto'><h5 style='color:white'>Change Password</h5><p style='color:#94a3b8;font-size:12px'>Logged in as: {session.get('name')} ({session.get('user')}) - Role: {session.get('role')}</p>"
+    if msg:
+        html+=f"<div class='alert' style='background:{color}22;border:1px solid {color};color:{color};font-size:12px;padding:8px;border-radius:8px'>{msg}</div>"
+    html+="""
+      <form method="POST" class="mt-3">
+        <label class="label">CURRENT PASSWORD</label><input name="current" type="password" class="form-control mb-2" placeholder="Enter current password" required>
+        <label class="label">NEW PASSWORD</label><input name="new" type="password" class="form-control mb-2" placeholder="Enter new password" required>
+        <label class="label">CONFIRM NEW PASSWORD</label><input name="confirm" type="password" class="form-control mb-3" placeholder="Confirm new password" required>
+        <button class="btn btn-warning w-100">Update Password</button>
+      </form>
+      <div class="mt-3 p-2" style="background:#0f172a;border-radius:8px"><small style="color:#64748b;font-size:11px">Agent default password is your Tencent ID. After changing, use new password to login.<br>Admin can reset your password to Tencent ID anytime.</small></div>
+    </div>
+    """
+    return page(html)
+
+@app.route("/reset_password/<aid>", methods=["POST"])
+@login_required
+def reset_password(aid):
+    if session.get("role")!="admin":
+        return redirect("/")
+    new_pass=request.form.get("new_pass","")
+    if not new_pass:
+        # Reset to Tencent ID
+        agents=get_all()
+        for a in agents:
+            if str(a.get("id"))==str(aid):
+                new_pass=str(a.get("TENCENT_ID"))
+                break
+    if db_root and new_pass:
+        db_root.child(f"agents/{aid}/LOGIN_PASS").set(new_pass)
+        try:
+            db_root.child("login_logs").push({
+                "user": session.get("user"),
+                "name": session.get("name"),
+                "role": "admin",
+                "type": f"RESET_PASSWORD for {aid} to {new_pass}",
+                "timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),
+                "date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),
+                "agent_id": aid
+            })
+        except: pass
+    return redirect(f"/view/{aid}")
+
+
 @app.route("/agents")
 @login_required
 def agents_list():
@@ -811,6 +928,29 @@ def view(aid):
       </form>
     </div>
     """
+    # Password management
+    if session.get("role")=="admin":
+        current_pw = data.get("LOGIN_PASS") or data.get("TENCENT_ID") or "1234 (default = Tencent ID)"
+        html+=f"""
+        <div class="card-dark mt-3" style="border:1px solid #ef4444">
+          <h6 style="color:#ef4444">Password Management - Admin</h6>
+          <p style="color:#94a3b8;font-size:11px">Current Password: <span style="color:#fbbf24">{current_pw}</span> | Username: {data.get("TENCENT_ID")} | Login: {data.get("TENCENT_ID")} / password</p>
+          <form method="POST" action="/reset_password/{aid}" class="row g-2">
+            <div class="col-6"><input name="new_pass" type="text" class="form-control form-control-sm" placeholder="New password (leave blank = reset to Tencent ID)"></div>
+            <div class="col-6"><button class="btn btn-sm btn-danger w-100">Reset / Set Password</button></div>
+          </form>
+          <small style="color:#64748b;font-size:10px">Reset will set password to Tencent ID if blank. Agent can change it later via Change Password.</small>
+        </div>
+        """
+    elif session.get("role")=="agent" and str(session.get("agent_id"))==str(aid):
+        html+=f"""
+        <div class="card-dark mt-3" style="border:1px solid #fbbf24">
+          <h6 style="color:#fbbf24">My Account - Change Password</h6>
+          <p style="color:#94a3b8;font-size:11px">You can update your password here. Current login: {data.get("TENCENT_ID")}</p>
+          <a href="/change_password" class="btn btn-sm btn-warning w-100">Change My Password</a>
+        </div>
+        """
+    
     html+=f"<div class='row g-2 mt-4'><div class='col-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Add Normal OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='NORMAL_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#22c55e;color:white'>Add Normal OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Add Restday OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='RESTDAY_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#3b82f6;color:white'>Add Restday OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f97316'><h6 style='color:#f97316'>Add AHT</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='AHT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='Minutes' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f97316;color:white'>Add AHT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>Add QA Score</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='QA'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='%' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='QA notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#8b5cf6;color:white'>Add QA</button></div></form></div></div><div class='col-12'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Add Loss Hours</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='LOSS'><div class='col-4'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Loss Hrs' required></div><div class='col-4'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-4'><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option></select></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#ef4444;color:white'>Add Loss</button></div></form></div></div></div>"
     # History for admin only
     if not is_agent:
