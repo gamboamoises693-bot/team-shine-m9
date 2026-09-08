@@ -290,6 +290,15 @@ def handle_500(e):
     tb = traceback.format_exc()
     return f"<div style='background:#0b1120;color:white;padding:20px'><h3>Error</h3><pre style='color:#fbbf24;font-size:10px'>{tb}</pre><a href='/' class='btn btn-warning'>Back</a></div>", 500
 
+
+@app.route("/health")
+def health():
+    return "OK", 200
+
+@app.route("/ping")
+def ping():
+    return "pong", 200
+
 @app.route("/logout")
 def logout():
     try:
