@@ -58,10 +58,10 @@ BASE = """<!doctype html><html><head><meta name="viewport" content="width=device
 <style>
 body{background:#0b1120;color:#f1f5f9;font-family:Inter,system-ui}
 .card-dark{background:#151e32;border:1px solid #2d3748;border-radius:20px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
-.kpi{padding:16px;border-radius:16px;background:#151e32;border:1px solid #2d3748;text-align:center;transition:all 0.2s}
+.kpi{padding:12px 8px;border-radius:16px;background:#151e32;border:1px solid #2d3748;text-align:center;transition:all 0.2s;min-height:110px;height:110px;display:flex;flex-direction:column;justify-content:center;align-items:center}
 .kpi:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.4)}
-.label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
-.val-big{font-size:26px;font-weight:800;margin-top:4px}
+.label{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;font-weight:600;line-height:11px;min-height:22px;display:flex;align-items:center;justify-content:center}
+.val-big{font-size:22px;font-weight:800;margin-top:2px;line-height:24px}
 .val{color:#fff;font-weight:600}
 .avatar{width:44px;height:44px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#111827}
 .table thead th{background:#0f172a!important;color:#fbbf24!important;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border:none!important}
@@ -108,11 +108,11 @@ def dashboard():
     # KPI Cards
     html="<div class='d-flex justify-content-between align-items-center mb-3'><h5 style='color:white'><i class='bi bi-speedometer2' style='color:#fbbf24'></i> Team Performance Overview</h5><small style='color:#94a3b8'>Last update: "+datetime.now().strftime("%b %d, %Y %I:%M %p")+"</small></div>"
     html+="<div class='row g-3'>"
-    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TEAM NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(round(team_normal,1))+"h</div><small style='color:#94a3b8'>"+str(round(team_normal/len(agents),1))+" avg</small></div></div>"
-    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>TEAM RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(round(team_restday,1))+"h</div><small style='color:#94a3b8'>"+str(round(team_restday/len(agents),1))+" avg</small></div></div>"
-    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>TEAM TOTAL OT</div><div class='val-big' style='color:#fbbf24'>"+str(round(team_total,1))+"h</div><small style='color:#22c55e'>N:"+str(round(team_normal,1))+" RD:"+str(round(team_restday,1))+"</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TEAM NORMAL OT</div><div class='val-big' style='color:#22c55e'>"+str(round(team_normal,1))+"h</div><small style='color:#94a3b8;font-size:10px'>"+str(round(team_normal/len(agents),1))+" avg</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>TEAM RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>"+str(round(team_restday,1))+"h</div><small style='color:#94a3b8;font-size:10px'>"+str(round(team_restday/len(agents),1))+" avg</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>TEAM TOTAL OT</div><div class='val-big' style='color:#fbbf24'>"+str(round(team_total,1))+"h</div><small style='color:#94a3b8'>Total Team</small></div></div>"
     html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>TEAM LOSS HRS</div><div class='val-big' style='color:#ef4444'>"+str(round(team_loss,1))+"h</div><small style='color:#ef4444'>Critical KPI</small></div></div>"
-    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #a855f7'><div class='label'>TEAM NET (OT-LOSS)</div><div class='val-big' style='color:#a855f7'>+"+str(round(team_net,1))+"h</div><small style='color:#94a3b8'>"+str(round(avg_net,1))+" avg/agent</small></div></div>"
+    html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #a855f7'><div class='label'>TEAM NET</div><div class='val-big' style='color:#a855f7'>+"+str(round(team_net,1))+"h</div><small style='color:#94a3b8'>"+str(round(avg_net,1))+" avg/agent</small></div></div>"
     html+="<div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #06b6d4'><div class='label'>AVG OT / AGENT</div><div class='val-big' style='color:#06b6d4'>"+str(round(avg_ot,1))+"h</div><small style='color:#94a3b8'>19 agents</small></div></div>"
     html+="</div>"
 
