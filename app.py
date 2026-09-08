@@ -33,16 +33,66 @@ COLS = ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN'
 def esc(v):
     return html.escape(str(v)) if v is not None else ""
 
+# --- OPTIMIZED - CACHE + BATCH ---
+_agents_cache = {'data': None, 'time': 0}
+import time
+from collections import defaultdict
+
 def get_all_agents():
+    global _agents_cache
+    # cache for 30 seconds to make it super fast
+    if _agents_cache['data'] and (time.time() - _agents_cache['time'] < 30):
+        return _agents_cache['data']
     docs = db.collection('agents').stream()
     agents = []
     for d in docs:
         data = d.to_dict()
         data['id'] = d.id
         agents.append(data)
-    # sort by NAME
     agents.sort(key=lambda x: x.get('NAME','').lower())
+    _agents_cache = {'data': agents, 'time': time.time()}
     return agents
+
+def get_totals_batch():
+    # ONE query for ALL OT and LOSS - super fast
+    ot_map = defaultdict(float)
+    loss_map = defaultdict(float)
+    ot_daily = defaultdict(float)
+    try:
+        # Collection group - gets all ot_logs in 1 call
+        for doc in db.collection_group('ot_logs').stream():
+            try:
+                # parent is agents/{agent_id}/ot_logs/{log_id}
+                agent_id = doc.reference.parent.parent.id
+                h = float(doc.to_dict().get('hours',0) or 0)
+                ot_map[agent_id] += h
+                dt = doc.to_dict().get('ot_date','')
+                if dt:
+                    ot_daily[dt]+=h
+            except:
+                pass
+    except Exception as e:
+        print("ot group error", e)
+        # fallback to old method if index not created
+        pass
+    
+    try:
+        for doc in db.collection_group('loss_logs').stream():
+            try:
+                agent_id = doc.reference.parent.parent.id
+                h = float(doc.to_dict().get('hours',0) or 0)
+                loss_map[agent_id] += h
+            except:
+                pass
+    except:
+        pass
+    
+    return ot_map, loss_map, ot_daily
+
+def clear_cache():
+    global _agents_cache
+    _agents_cache = {'data': None, 'time': 0}
+
 
 def get_agent(aid):
     doc = db.collection('agents').document(str(aid)).get()
@@ -169,9 +219,9 @@ def add_edit(aid=None):
     if request.method=="POST":
         vals = {c: request.form.get(c,"") for c in COLS}
         if aid:
-            db.collection('agents').document(aid).update(vals)
+            clear_cache(); db.collection('agents').document(aid).update(vals)
         else:
-            _, doc_ref = db.collection('agents').add(vals)
+            clear_cache(); _, doc_ref = db.collection('agents').add(vals)
             aid = doc_ref.id
         return redirect(f"/view/{aid}")
     f = "".join([f"<div class='col-md-6 mb-3'><label class='field-label'>{esc(c)}</label><input name='{c}' value='{esc(ag.get(c,'')) if ag else ''}' class='form-control input-dark'></div>" for c in COLS])
@@ -181,7 +231,7 @@ def add_edit(aid=None):
 
 @app.route("/add_ot/<aid>", methods=["POST"])
 def add_ot(aid):
-    db.collection('agents').document(aid).collection('ot_logs').add({
+    clear_cache(); db.collection('agents').document(aid).collection('ot_logs').add({
         'ot_date': request.form.get('ot_date'),
         'ot_type': request.form.get('ot_type'),
         'hours': float(request.form.get('hours',0)),
@@ -192,7 +242,7 @@ def add_ot(aid):
 
 @app.route("/add_loss/<aid>", methods=["POST"])
 def add_loss(aid):
-    db.collection('agents').document(aid).collection('loss_logs').add({
+    clear_cache(); db.collection('agents').document(aid).collection('loss_logs').add({
         'loss_date': request.form.get('loss_date'),
         'loss_type': request.form.get('loss_type'),
         'hours': float(request.form.get('hours',0)),
@@ -208,7 +258,7 @@ def delete(aid):
         docs = db.collection('agents').document(aid).collection(coll).stream()
         for d in docs:
             d.reference.delete()
-    db.collection('agents').document(aid).delete()
+    clear_cache(); db.collection('agents').document(aid).delete()
     return redirect("/")
 
 @app.route("/export_csv")
@@ -884,6 +934,7 @@ def dashboard():
     ot_daily = defaultdict(float)
     new_hires = 0
     
+    ot_map, loss_map, ot_daily = get_totals_batch()
     for a in agents:
         aid = a['id']
         # check date hired
@@ -891,26 +942,11 @@ def dashboard():
         if this_month in str(dh) or now.strftime("%Y-%m") in str(dh) or str(now.year) in str(dh) and str(now.month) in str(dh):
             # simple: if hired 2026-05 etc
             pass
-        # OT
-        ot_sum = 0
-        for d in db.collection('agents').document(aid).collection('ot_logs').stream():
-            h = float(d.to_dict().get('hours',0) or 0)
-            ot_sum+=h
-            ot_total+=h
-            dt = d.to_dict().get('ot_date','')
-            if dt:
-                ot_daily[dt]+=h
+        ot_sum = ot_map.get(aid, 0)
+        loss_sum = loss_map.get(aid, 0)
+        ot_total += ot_sum
+        loss_total += loss_sum
         ot_by_agent[a.get('NAME','')] = ot_sum
-        
-        # LOSS (if exists)
-        loss_sum = 0
-        try:
-            for d in db.collection('agents').document(aid).collection('loss_logs').stream():
-                h = float(d.to_dict().get('hours',0) or 0)
-                loss_sum+=h
-                loss_total+=h
-        except:
-            pass
         loss_by_agent[a.get('NAME','')] = loss_sum
         
         # new hire check (last 30 days)
