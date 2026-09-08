@@ -141,7 +141,7 @@ input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px sol
 <a href="/leaderboard" class="btn btn-sm btn-outline-warning">🏆</a>
 <a href="/export" class="btn btn-sm btn-outline-light">📥</a>
 <a href="/bulk" class="btn btn-sm btn-outline-light">📤</a>
-<a href="/logs" class="btn btn-sm btn-outline-light">📋</a> <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> <a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a> 
+<a href="/working_hours" class="btn btn-sm btn-outline-light">⏱️ 220h</a> <a href="/bpo_benchmarks" class="btn btn-sm btn-outline-warning">📊 BPO</a> <a href="/burnout" class="btn btn-sm btn-outline-danger">🔥 Burnout</a> <a href="/weekly" class="btn btn-sm btn-outline-light">📅 Weekly</a> <a href="/logs" class="btn btn-sm btn-outline-light">📋</a> <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> <a href="/change_password" class="btn btn-sm btn-outline-light">🔑</a> 
 <a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
 </div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
@@ -537,6 +537,274 @@ def dashboard():
     html+="</tbody></table></div></div><script>document.addEventListener('DOMContentLoaded',function(){var i=document.getElementById('teamSearch');if(!i)return;i.addEventListener('keyup',function(){var q=this.value.toLowerCase();document.querySelectorAll('#teamTable tbody tr').forEach(function(r){r.style.display=r.innerText.toLowerCase().includes(q)?'':'none';});});});</script>"
     return page(html)
 
+
+@app.route("/working_hours")
+@login_required
+def working_hours_monitoring():
+    if session.get("role")=="agent":
+        return redirect(f"/view/{session.get('agent_id')}")
+    agents=get_all()
+    stats=[]
+    for a in agents:
+        logs=get_ot(a.get("id"))
+        n,r,tot,loss,net=calc(logs)
+        wh_target = float(a.get("WORKING_HOURS_TARGET", 220))
+        actual_worked = wh_target - loss
+        compliance = (actual_worked / wh_target * 100) if wh_target>0 else 0
+        ot_target = float(a.get("TARGET_OT", 20))
+        ot_pct = (tot / ot_target * 100) if ot_target>0 else 0
+        status = "Good" if compliance>=95 else "Warning" if compliance>=90 else "Critical"
+        stats.append({
+            "id": a.get("id"),
+            "name": a.get("NAME",""),
+            "tid": a.get("TENCENT_ID",""),
+            "wh_target": wh_target,
+            "loss": loss,
+            "actual": actual_worked,
+            "compliance": compliance,
+            "tot": tot,
+            "ot_target": ot_target,
+            "ot_pct": ot_pct,
+            "status": status
+        })
+    stats_sorted = sorted(stats, key=lambda x: x["compliance"])
+    rows=""
+    for s in stats_sorted:
+        bar_color = "#22c55e" if s["compliance"]>=95 else "#fbbf24" if s["compliance"]>=90 else "#ef4444"
+        ot_bar_color = "#22c55e" if s["ot_pct"]>=100 else "#fbbf24" if s["ot_pct"]>=70 else "#ef4444"
+        badge = "<span class='badge bg-success'>Good</span>" if s["status"]=="Good" else "<span class='badge bg-warning text-dark'>Warning</span>" if s["status"]=="Warning" else "<span class='badge bg-danger'>Critical</span>"
+        rows+=f"<tr><td><a href='/view/{s['id']}' style='color:white'><b>{s['name']}</b><br><small style='color:#94a3b8'>{s['tid']}</small></a></td><td>{s['wh_target']}h</td><td style='color:#ef4444'>{s['loss']}h</td><td style='color:#22c55e'>{round(s['actual'],1)}h</td><td><div class='progress' style='height:10px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,s['compliance'])}%;background:{bar_color}'></div></div><small>{round(s['compliance'],1)}%</small></td><td>{s['tot']}h / {s['ot_target']}h<br><div class='progress' style='height:6px;width:80px;background:#0f172a'><div class='progress-bar' style='width:{min(100,s['ot_pct'])}%;background:{ot_bar_color}'></div></div><small>{round(s['ot_pct'],0)}%</small></td><td>{badge}</td></tr>"
+    html=f"""
+    <div class='d-flex justify-content-between align-items-center'>
+        <h5 style='color:white'>Working Hours Monitoring - 220 Hrs Target (10 hrs x 22 days)</h5>
+        <a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a>
+    </div>
+    <div class='row g-2 mt-2'>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL TARGET HRS (19 agents)</div><div class='val-big' style='color:#22c55e'>{19*220}h</div><small style='color:#94a3b8'>220 x 19</small></div></div>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>TOTAL LOSS HRS</div><div class='val-big' style='color:#ef4444'>{round(sum(s['loss'] for s in stats),1)}h</div></div></div>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL ACTUAL WORKED</div><div class='val-big' style='color:#22c55e'>{round(sum(s['actual'] for s in stats),1)}h</div></div></div>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>AVG COMPLIANCE</div><div class='val-big' style='color:#fbbf24'>{round(sum(s['compliance'] for s in stats)/len(stats),1) if stats else 0}%</div></div></div>
+    </div>
+    <div class='card-dark mt-3'>
+        <h6 style='color:#fbbf24'>Per Agent - Working Hours Compliance + OT Progress</h6>
+        <small style='color:#94a3b8'>Compliance = (220 - Loss) / 220. OT Progress = Total OT / OT Target. Good if Compliance >=95%</small>
+        <div class='table-responsive mt-3'><table class='table table-sm'><thead><tr><th>AGENT</th><th>TARGET WH</th><th>LOSS</th><th>ACTUAL WORKED</th><th>COMPLIANCE</th><th>OT PROGRESS</th><th>STATUS</th></tr></thead><tbody>{rows}</tbody></table></div>
+    </div>
+    <div class='card-dark mt-3'>
+        <h6 style='color:white'>Recommended Monitoring for 10 hrs / 220 hrs</h6>
+        <div style='color:#94a3b8;font-size:12px'>
+            <b style='color:#fbbf24'>1. Compliance Monitoring:</b> Track (220 - Loss)/220 - alert if <95%<br>
+            <b style='color:#fbbf24'>2. OT Utilization:</b> OT should be <20% of working hours (44h max) to avoid burnout<br>
+            <b style='color:#fbbf24'>3. Shrinkage:</b> Loss/220 - keep <5%<br>
+            <b style='color:#fbbf24'>4. Weekly Check:</b> 55 hrs/week target (10x5 + 5 OT) - monitor weekly<br>
+            <b style='color:#fbbf24'>5. Burnout Alert:</b> If OT >40h/month + Loss >8h = high risk<br>
+            <b style='color:#fbbf24'>6. Suggestion:</b> Add Rest Day OT tracking separately - don't count as working hours compliance
+        </div>
+    </div>
+    """
+    return page(html)
+
+
+
+@app.route("/bpo_benchmarks")
+@login_required
+def bpo_benchmarks():
+    if session.get("role")=="agent":
+        return redirect(f"/view/{session.get('agent_id')}")
+    agents=get_all()
+    total_loss=0
+    total_ot=0
+    aht_vals=[]
+    qa_vals=[]
+    for a in agents:
+        logs=get_ot(a.get("id"))
+        n,r,tot,loss,net=calc(logs)
+        total_loss+=loss
+        total_ot+=tot
+        plogs=get_perf(a.get("id"))
+        la,lq,aa,qa,_,_=calc_perf(plogs)
+        if la>0: aht_vals.append(la)
+        if lq>0: qa_vals.append(lq)
+    avg_aht = sum(aht_vals)/len(aht_vals) if aht_vals else 0
+    avg_qa = sum(qa_vals)/len(qa_vals) if qa_vals else 0
+    wh_target_total = len(agents)*220
+    shrinkage = (total_loss / wh_target_total * 100) if wh_target_total>0 else 0
+    compliance = ((wh_target_total - total_loss) / wh_target_total * 100) if wh_target_total>0 else 0
+    ot_ratio = (total_ot / wh_target_total * 100) if wh_target_total>0 else 0
+    
+    html=f"""
+    <div class='d-flex justify-content-between'><h5 style='color:white'>BPO Industry Benchmarks vs TEAM SHINE M9</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div>
+    <small style='color:#94a3b8'>Based on industry standards: AHT 6m 3s, QA 75-90%, Shrinkage 30%, Occupancy 85-90%, FCR 70-75%, Service Level 80% in 20s</small>
+    
+    <div class='row g-3 mt-3'>
+        <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #f97316'><h6 style='color:#f97316'>AHT - Average Handle Time</h6>
+            <div class='row'><div class='col-6'><small style='color:#94a3b8'>Industry Standard</small><div style='color:white;font-weight:700'>6m 3s (363s)</div><small style='color:#64748b'>Based on 190k entries</small><br><small style='color:#94a3b8'>Telco: 8m 48s (528s)<br>Retail: 5m 24s (324s)<br>IT/Business: 4m 42s (282s)</small></div>
+            <div class='col-6'><small style='color:#94a3b8'>Your Team</small><div style='color:#f97316;font-weight:700;font-size:20px'>{round(avg_aht,1)}m</div><small style='color:#94a3b8'>Avg of {len(aht_vals)} agents</small><br>{'<span class="badge bg-success">Excellent - Below industry</span>' if avg_aht<=6 else '<span class="badge bg-warning text-dark">Good - Near industry</span>' if avg_aht<=8 else '<span class="badge bg-danger">High - Need improvement</span>' if avg_aht>0 else '<span class="badge bg-secondary">No data</span>'}</div></div>
+        </div></div>
+        <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>QA - Quality Assurance</h6>
+            <div class='row'><div class='col-6'><small style='color:#94a3b8'>Industry Standard</small><div style='color:white;font-weight:700'>75-90%</div><small style='color:#64748b'>Random 4 calls/month scoring</small></div>
+            <div class='col-6'><small style='color:#94a3b8'>Your Team</small><div style='color:#8b5cf6;font-weight:700;font-size:20px'>{round(avg_qa,1)}%</div><small style='color:#94a3b8'>Avg of {len(qa_vals)} agents</small><br>{'<span class="badge bg-success">Excellent - Above 90%</span>' if avg_qa>=90 else '<span class="badge bg-warning text-dark">Good - Within 75-90%</span>' if avg_qa>=75 else '<span class="badge bg-danger">Below standard</span>' if avg_qa>0 else '<span class="badge bg-secondary">No data</span>'}</div></div>
+        </div></div>
+        <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Shrinkage - Non-productive time</h6>
+            <div class='row'><div class='col-6'><small style='color:#94a3b8'>Industry Standard</small><div style='color:white;font-weight:700'>30% (26.6% avg entered)</div><small style='color:#64748b'>Healthy: 30-35% including training, breaks, PTO</small></div>
+            <div class='col-6'><small style='color:#94a3b8'>Your Team</small><div style='color:#ef4444;font-weight:700;font-size:20px'>{round(shrinkage,1)}% ({round(total_loss,1)}h / {wh_target_total}h)</div><small style='color:#94a3b8'>Loss / Total Scheduled</small><br>{'<span class="badge bg-success">Excellent - Below 10%</span>' if shrinkage<10 else '<span class="badge bg-warning text-dark">Good - Below 20%</span>' if shrinkage<20 else '<span class="badge bg-danger">High - Above 20%</span>'}</div></div>
+        </div></div>
+        <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Compliance / Adherence</h6>
+            <div class='row'><div class='col-6'><small style='color:#94a3b8'>Industry Standard</small><div style='color:white;font-weight:700'>Adherence 90%+, Occupancy 85-90%</div><small style='color:#64748b'>Best occupancy 85-90% to avoid burnout</small></div>
+            <div class='col-6'><small style='color:#94a3b8'>Your Team</small><div style='color:#22c55e;font-weight:700;font-size:20px'>{round(compliance,1)}%</div><small style='color:#94a3b8'>(Total - Loss)/Total</small><br>{'<span class="badge bg-success">Excellent >=95%</span>' if compliance>=95 else '<span class="badge bg-warning text-dark">Warning 90-94%</span>' if compliance>=90 else '<span class="badge bg-danger">Critical <90%</span>'}</div></div>
+        </div></div>
+        <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #fbbf24'><h6 style='color:#fbbf24'>OT Ratio & Burnout</h6>
+            <div class='row'><div class='col-6'><small style='color:#94a3b8'>Industry Best Practice</small><div style='color:white;font-weight:700'>OT <15% of working hours</div><small style='color:#64748b'>Max 44h OT for 220h target<br>Burnout risk if OT>40h + high loss</small></div>
+            <div class='col-6'><small style='color:#94a3b8'>Your Team</small><div style='color:#fbbf24;font-weight:700;font-size:20px'>{round(ot_ratio,1)}% ({round(total_ot,1)}h)</div><small style='color:#94a3b8'>Total OT / Total WH</small><br>{'<span class="badge bg-success">Healthy <15%</span>' if ot_ratio<15 else '<span class="badge bg-warning text-dark">Monitor 15-20%</span>' if ot_ratio<20 else '<span class="badge bg-danger">High risk >20%</span>'}</div></div>
+        </div></div>
+        <div class='col-12 col-md-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Service Level & FCR</h6>
+            <div class='row'><div class='col-6'><small style='color:#94a3b8'>Industry Standard</small><div style='color:white;font-weight:700'>SL: 80% in 20s<br>FCR: 70-75%</div><small style='color:#64748b'>Phone: 80% in 20s<br>Email: 100% in 24h<br>Chat: 80% in 20s</small></div>
+            <div class='col-6'><small style='color:#94a3b8'>Your Team</small><div style='color:#3b82f6;font-weight:700;font-size:14px'>Monitor via QA & AHT</div><small style='color:#94a3b8'>If QA high + AHT low = good FCR<br>Track repeat calls for FCR</small><br><span class='badge bg-info'>Add FCR tracking soon</span></div></div>
+        </div></div>
+    </div>
+    
+    <div class='card-dark mt-3' style='border:1px solid #fbbf24'>
+        <h6 style='color:#fbbf24'>BPO Benchmarking - Recommendations for TEAM SHINE M9</h6>
+        <div style='color:#cbd5e1;font-size:13px;line-height:1.6'>
+            <b style='color:#22c55e'>✅ Where you are good:</b><br>
+            - Shrinkage {round(shrinkage,1)}% is {'excellent vs 30% industry' if shrinkage<15 else 'good vs 30% industry'} - means low absenteeism<br>
+            - Compliance {round(compliance,1)}% is {'excellent' if compliance>=95 else 'good'} - keep above 95%<br>
+            - OT Ratio {round(ot_ratio,1)}% is {'healthy <15%' if ot_ratio<15 else 'monitor'} - avoid burnout<br><br>
+            <b style='color:#fbbf24'>⚠️ What to improve:</b><br>
+            - AHT {round(avg_aht,1)}m vs industry 6m 3s - {'maintain if quality good' if avg_aht<=7 else 'consider coaching + cheat sheets'}<br>
+            - QA {round(avg_qa,1)}% vs 75-90% - {'excellent' if avg_qa>=90 else 'aim for 90%+ via peer feedback + analytics'}<br>
+            - Add FCR tracking: % issues resolved first contact - target 70-75%<br>
+            - Add Service Level: % calls answered in 20s - target 80%<br>
+            - Occupancy: keep 85-90% to avoid burnout (not 100%)<br><br>
+            <b style='color:#3b82f6'>📈 Next Steps to be Top 10% BPO:</b><br>
+            1. Weekly 55h monitoring (10h x 5 + 5 OT) - add weekly dashboard<br>
+            2. Burnout alerts: OT>40h + Loss>8h + QA drop = high risk<br>
+            3. Peer QA feedback sessions (rotate weekly)<br>
+            4. Cheat sheets for AHT reduction without hurting quality<br>
+            5. Annualized hours: 1820h/year contract to reduce absenteeism by 8%<br>
+            6. Track FCR, CSAT, NPS for full picture
+        </div>
+    </div>
+    """
+    return page(html)
+
+@app.route("/burnout")
+@login_required
+def burnout_monitoring():
+    if session.get("role")=="agent":
+        return redirect(f"/view/{session.get('agent_id')}")
+    agents=get_all()
+    burnout_list=[]
+    for a in agents:
+        logs=get_ot(a.get("id"))
+        n,r,tot,loss,net=calc(logs)
+        plogs=get_perf(a.get("id"))
+        la,lq,aa,qa,_,_=calc_perf(plogs)
+        # Burnout score: OT>40 + Loss>5 + QA<85 + AHT>10 = high risk
+        risk_score=0
+        factors=[]
+        if tot>40:
+            risk_score+=30
+            factors.append(f"High OT {tot}h")
+        elif tot>30:
+            risk_score+=15
+            factors.append(f"Moderate OT {tot}h")
+        if loss>8:
+            risk_score+=30
+            factors.append(f"High Loss {loss}h")
+        elif loss>4:
+            risk_score+=15
+            factors.append(f"Loss {loss}h")
+        if lq>0 and lq<80:
+            risk_score+=20
+            factors.append(f"Low QA {lq}%")
+        elif lq>0 and lq<85:
+            risk_score+=10
+            factors.append(f"QA {lq}%")
+        if la>10:
+            risk_score+=20
+            factors.append(f"High AHT {la}m")
+        risk = "Critical" if risk_score>=60 else "High" if risk_score>=40 else "Moderate" if risk_score>=20 else "Low"
+        burnout_list.append({"id":a.get("id"),"name":a.get("NAME",""),"tid":a.get("TENCENT_ID",""),"tot":tot,"loss":loss,"qa":lq,"aht":la,"score":risk_score,"risk":risk,"factors":", ".join(factors) if factors else "No risk factors"})
+    burnout_sorted=sorted(burnout_list, key=lambda x: x["score"], reverse=True)
+    rows=""
+    for b in burnout_sorted:
+        color="#22c55e" if b["risk"]=="Low" else "#fbbf24" if b["risk"]=="Moderate" else "#f97316" if b["risk"]=="High" else "#ef4444"
+        badge=f"<span class='badge' style='background:{color}'>{b['risk']} ({b['score']})</span>"
+        rows+=f"<tr><td><a href='/view/{b['id']}' style='color:white'><b>{b['name']}</b><br><small style='color:#94a3b8'>{b['tid']}</small></a></td><td>{b['tot']}h</td><td>{b['loss']}h</td><td>{b['qa']}%</td><td>{b['aht']}m</td><td>{badge}</td><td><small style='color:#94a3b8'>{b['factors']}</small></td></tr>"
+    html=f"""
+    <div class='d-flex justify-content-between'><h5 style='color:white'>Burnout Risk Monitoring</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div>
+    <div class='row g-2 mt-2'>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>LOW RISK</div><div class='val-big' style='color:#22c55e'>{len([b for b in burnout_list if b['risk']=='Low'])}</div></div></div>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>MODERATE</div><div class='val-big' style='color:#fbbf24'>{len([b for b in burnout_list if b['risk']=='Moderate'])}</div></div></div>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #f97316'><div class='label'>HIGH</div><div class='val-big' style='color:#f97316'>{len([b for b in burnout_list if b['risk']=='High'])}</div></div></div>
+        <div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>CRITICAL</div><div class='val-big' style='color:#ef4444'>{len([b for b in burnout_list if b['risk']=='Critical'])}</div></div></div>
+    </div>
+    <div class='card-dark mt-3'><h6 style='color:#fbbf24'>Per Agent Burnout Risk - Based on OT, Loss, QA, AHT</h6>
+        <small style='color:#94a3b8'>Score: OT>40=30pts, Loss>8=30pts, QA<80=20pts, AHT>10=20pts. Critical >=60, High >=40, Moderate >=20, Low <20</small>
+        <div class='table-responsive mt-3'><table class='table table-sm'><thead><tr><th>AGENT</th><th>OT</th><th>LOSS</th><th>QA</th><th>AHT</th><th>RISK</th><th>FACTORS</th></tr></thead><tbody>{rows}</tbody></table></div>
+    </div>
+    """
+    return page(html)
+
+@app.route("/weekly")
+@login_required
+def weekly_monitoring():
+    if session.get("role")=="agent":
+        return redirect(f"/view/{session.get('agent_id')}")
+    # Weekly 55h monitoring (10x5 + 5 OT)
+    agents=get_all()
+    from datetime import timedelta
+    now = datetime.now(PH_TZ)
+    # Last 4 weeks
+    weeks=[]
+    for i in range(4):
+        week_num = (now - timedelta(weeks=i)).isocalendar()[1]
+        year = (now - timedelta(weeks=i)).year
+        weeks.append((year, week_num))
+    html=f"""
+    <div class='d-flex justify-content-between'><h5 style='color:white'>Weekly 55h Monitoring (10h x 5 + 5 OT)</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div>
+    <small style='color:#94a3b8'>Target: 55h/week = 220h/month. 10h/day x 5 days + 5h OT buffer. Monitor weekly to catch issues early.</small>
+    <div class='row g-2 mt-3'>
+    """
+    for year, week_num in weeks:
+        week_logs = []
+        for a in agents:
+            logs=get_ot(a.get("id"))
+            week_tot=0
+            for l in logs:
+                try:
+                    dt = datetime.strptime(l.get("date",""), "%Y-%m-%d")
+                    if dt.isocalendar()[1]==week_num and dt.year==year:
+                        if l.get("type") in ["NORMAL_OT","RESTDAY_OT"]:
+                            week_tot+=float(l.get("hours",0))
+                except: pass
+            week_logs.append(week_tot)
+        avg_week = sum(week_logs)/len(week_logs) if week_logs else 0
+        html+=f"<div class='col-6 col-md-3'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>WEEK {week_num} - {year}</div><div class='val-big' style='color:#fbbf24'>{round(avg_week,1)}h avg</div><small style='color:#94a3b8'>Target 55h</small></div></div>"
+    html+="</div>"
+    
+    # Per agent weekly breakdown
+    rows=""
+    for a in agents:
+        row=f"<tr><td><b>{a.get('NAME','')}</b><br><small style='color:#94a3b8'>{a.get('TENCENT_ID','')}</small></td>"
+        for year, week_num in weeks:
+            logs=get_ot(a.get("id"))
+            week_tot=0
+            for l in logs:
+                try:
+                    dt = datetime.strptime(l.get("date",""), "%Y-%m-%d")
+                    if dt.isocalendar()[1]==week_num and dt.year==year:
+                        if l.get("type") in ["NORMAL_OT","RESTDAY_OT"]:
+                            week_tot+=float(l.get("hours",0))
+                except: pass
+            color="#22c55e" if week_tot>=50 else "#fbbf24" if week_tot>=40 else "#ef4444"
+            row+=f"<td style='color:{color}'>{round(week_tot,1)}h</td>"
+        row+="</tr>"
+        rows+=row
+    html+=f"<div class='card-dark mt-3'><h6 style='color:#fbbf24'>Per Agent - Last 4 Weeks OT</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>AGENT</th>{''.join([f'<th>W{w} - {y}</th>' for y,w in weeks])}</tr></thead><tbody>{rows}</tbody></table></div></div>"
+    return page(html)
+
 @app.route("/leaderboard")
 @login_required
 def leaderboard():
@@ -671,11 +939,13 @@ def bulk_import():
     return page(html)
 
 
+
 @app.route("/logs")
 @login_required
 def login_logs():
-    if session.get("role") not in ["admin"]:
-        return redirect("/")
+    if session.get("role") not in ["admin","team_leader","admin"]:
+        if session.get("role")!="admin":
+            return redirect("/")
     try:
         logs_raw = db_root.child("login_logs").get() if db_root else {}
         logs=[]
@@ -683,15 +953,41 @@ def login_logs():
             for lid, v in logs_raw.items():
                 if isinstance(v, dict):
                     logs.append(v)
-        logs_sorted=sorted(logs, key=lambda x: x.get("timestamp",""), reverse=True)[:100]
+        logs_sorted=sorted(logs, key=lambda x: x.get("timestamp",""), reverse=True)
+        # Get search query
+        search_q = request.args.get("q","").lower().strip()
+        if search_q:
+            logs_sorted = [l for l in logs_sorted if search_q in str(l.get("name","")).lower() or search_q in str(l.get("user","")).lower() or search_q in str(l.get("agent_id","")).lower()]
+            display_logs = logs_sorted[:50]  # Show 50 when searching
+        else:
+            display_logs = logs_sorted[:20]  # Last 20 only when no search
         rows=""
-        for l in logs_sorted:
+        for l in logs_sorted[:100] if search_q else display_logs:
             color="#22c55e" if l.get("type")=="LOGIN" else "#ef4444" if l.get("type")=="LOGOUT" else "#fbbf24"
-            rows+=f"<tr><td style='color:#cbd5e1'>{l.get('timestamp','')}</td><td><b style='color:white'>{l.get('name','')}</b><br><small style='color:#94a3b8'>{l.get('user','')}</small></td><td><span class='badge' style='background:{color}'>{l.get('type')}</span></td><td>{l.get('role')}</td><td>{l.get('agent_id','')}</td></tr>"
+            rows+=f"<tr><td style='color:#cbd5e1'>{l.get('timestamp','')}</td><td><b style='color:white'>{l.get('name','')}</b><br><small style='color:#94a3b8'>{l.get('user','')} | ID:{l.get('agent_id','')}</small></td><td><span class='badge' style='background:{color}'>{l.get('type')}</span></td><td>{l.get('role')}</td><td>{l.get('agent_id','')}</td></tr>"
         if not rows:
-            rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No logs yet</td></tr>"
-        html="<div class='d-flex justify-content-between'><h5 style='color:white'>Login / Logout Logs</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div>"
-        html+=f"<div class='card-dark mt-3'><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Time</th><th>User</th><th>Type</th><th>Role</th><th>ID</th></tr></thead><tbody>{rows}</tbody></table></div></div>"
+            rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No logs found</td></tr>"
+        html=f"""
+        <div class='d-flex justify-content-between align-items-center flex-wrap gap-2'>
+            <h5 style='color:white'>Login Logs - Last 20 Recent</h5>
+            <div class='d-flex gap-2'>
+                <form method='GET' class='d-flex gap-2'>
+                    <input name='q' value='{request.args.get('q','')}' class='form-control form-control-sm' placeholder='Search agent (name/Tencent ID)...' style='width:220px'>
+                    <button class='btn btn-sm btn-warning'>Search</button>
+                </form>
+                <a href='/logs' class='btn btn-sm btn-outline-light'>Reset</a>
+                <a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a>
+            </div>
+        </div>
+        <div class='mt-2'><small style='color:#94a3b8'>Showing {len(display_logs)} logs (last 20 by default, 50 when searching). Total logs: {len(logs_sorted)} | Search by agent name, Tencent ID, or Agent ID</small></div>
+        <div class='card-dark mt-3'><div class='table-responsive'><table id='logsTable' class='table table-sm'><thead><tr><th>Time</th><th>User</th><th>Type</th><th>Role</th><th>ID</th></tr></thead><tbody>{rows}</tbody></table></div></div>
+        <div class='card-dark mt-3'><h6 style='color:#fbbf24'>Working Hours Monitoring - 220 Hrs Target</h6>
+            <small style='color:#94a3b8'>Agent working hours = 10 hrs/day x 22 days = 220 hrs/month<br>
+            Compliance = (220 - Loss) / 220 * 100%<br>
+            Good if >=95%, Warning if 90-94%, Critical if <90%<br>
+            OT Target is separate - for extra hours beyond 220</small>
+        </div>
+        """
         return page(html)
     except Exception as e:
         import traceback
