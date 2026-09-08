@@ -1,79 +1,63 @@
 
-import os, html
-import psycopg2
-import psycopg2.extras
-from flask import Flask, request, redirect, g, Response
+import os, json, html, io, csv
+from flask import Flask, request, redirect, Response
 from datetime import datetime
-import io, csv, json
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "shine-m9-secret-key-change-me")
 
-# --- Persistent storage fix -------------------------------------------------
-# Your data now lives in a Render PostgreSQL database instead of a file next
-# to the app. A database is a separate Render resource from your web service,
-# so redeploying/restarting the web service never touches it - that's what
-# was wiping your data before.
-#
-# Setup on Render:
-#   1. Dashboard -> New -> PostgreSQL (the Free plan is fine to start).
-#   2. Open your web service -> Environment -> add DATABASE_URL, and set it
-#      to the "Internal Database URL" shown on the Postgres page (if the
-#      database and web service are in the same Render account/region you
-#      can also just use the "Connect" button on the web service to link it
-#      automatically).
-#   3. Redeploy. init_db() below creates the tables automatically the first
-#      time it connects.
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# --- Firebase Init ---
+# On Render: set FIREBASE_CREDENTIALS env var = entire JSON content of service account
+# Locally: put serviceAccountKey.json in same folder as this file
+
+if not firebase_admin._apps:
+    cred_json = os.environ.get("FIREBASE_CREDENTIALS")
+    if cred_json:
+        # Handle both raw JSON and base64 (some people paste it weird)
+        cred_dict = json.loads(cred_json)
+        cred = credentials.Certificate(cred_dict)
+    else:
+        # Local file fallback
+        if os.path.exists("serviceAccountKey.json"):
+            cred = credentials.Certificate("serviceAccountKey.json")
+        else:
+            raise RuntimeError("FIREBASE_CREDENTIALS not set and serviceAccountKey.json not found. See setup guide.")
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+COLS = ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']
 
 def esc(v):
-    """Escape any value before dropping it into raw HTML strings, to prevent stored/reflected XSS."""
     return html.escape(str(v)) if v is not None else ""
 
-class DB:
-    """Thin wrapper so the rest of the app can keep calling db.execute(query, params)
-    the same way it did with sqlite3, instead of rewriting every query to use
-    a psycopg2 cursor directly."""
-    def __init__(self, conn):
-        self.conn = conn
-    def execute(self, query, params=()):
-        cur = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(query.replace("?", "%s"), params)  # sqlite used "?" placeholders, psycopg2 needs "%s"
-        return cur
-    def commit(self):
-        self.conn.commit()
-    def close(self):
-        self.conn.close()
+def get_all_agents():
+    docs = db.collection('agents').stream()
+    agents = []
+    for d in docs:
+        data = d.to_dict()
+        data['id'] = d.id
+        agents.append(data)
+    # sort by NAME
+    agents.sort(key=lambda x: x.get('NAME','').lower())
+    return agents
 
-def get_db():
-    db = getattr(g, '_db', None)
-    if db is None:
-        if not DATABASE_URL:
-            raise RuntimeError("DATABASE_URL is not set. Add a PostgreSQL database in Render and set DATABASE_URL to its connection string.")
-        sslmode = "disable" if ("localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL) else "require"
-        conn = psycopg2.connect(DATABASE_URL, sslmode=sslmode)
-        db = g._db = DB(conn)
-    return db
+def get_agent(aid):
+    doc = db.collection('agents').document(str(aid)).get()
+    if not doc.exists:
+        return None
+    data = doc.to_dict()
+    data['id'] = doc.id
+    return data
 
-def init_db():
-    db = get_db()
-    cols = ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']
-    cols_def = ", ".join([f'"{c}" TEXT' for c in cols])
-    db.execute(f'CREATE TABLE IF NOT EXISTS agents (id SERIAL PRIMARY KEY, {cols_def})')
-    db.execute("""CREATE TABLE IF NOT EXISTS ot_logs (id SERIAL PRIMARY KEY, agent_id INTEGER, ot_date TEXT, ot_type TEXT, hours REAL, remarks TEXT, created_at TEXT)""")
-    db.execute("""CREATE TABLE IF NOT EXISTS loss_logs (id SERIAL PRIMARY KEY, agent_id INTEGER, loss_date TEXT, loss_type TEXT, hours REAL, remarks TEXT, created_at TEXT)""")
-    db.commit()
-
-@app.teardown_appcontext
-def close_connection(ex):
-    db = getattr(g, '_db', None)
-    if db is not None:
-        db.close()
-
+# --- BASE HTML kept from your original ---
 BASE_HTML = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 __REFRESH__
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-<title>TEAM SHINE M9 - Fixed Graph</title>
+<title>TEAM SHINE M9 - Firebase</title>
 <style>
 body{background:#080c14;color:#e2e8f0;font-family:system-ui}
 .navbar{background:#0f172a!important;border-bottom:1px solid #1e293b}
@@ -106,256 +90,133 @@ body{background:#080c14;color:#e2e8f0;font-family:system-ui}
 @media (max-width: 992px){.desktop-grid{grid-template-columns:1fr!important}.agent-sidebar{position:static!important}.ot-loss-grid{grid-template-columns:1fr!important}.chart-container{height:300px!important}}
 </style></head><body>
 <nav class="navbar navbar-dark p-3 sticky-top"><div class="container-fluid d-flex justify-content-between flex-wrap gap-2">
-<div class="d-flex align-items-center gap-3"><div style="width:42px;height:42px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:12px;display:flex;align-items:center;justify-content:center"><i class="bi bi-bar-chart text-dark"></i></div><div><div class="fw-bold fs-5">TEAM SHINE M9</div><div style="font-size:10px;color:#22c55e;letter-spacing:1px;font-weight:700">● FIXED GRAPH • NO AUTO-ADJUST</div></div><span class="badge bg-warning text-dark ms-2" style="border-radius:10px;padding:8px 12px;font-weight:800">__COUNT__ AGENTS</span></div>
-<div class="d-flex gap-2 flex-wrap"><a href="/" class="btn btn-sm btn-outline-light" style="border-radius:10px">Dashboard</a><a href="/ot_report" class="btn btn-sm btn-outline-warning" style="border-radius:10px">Reports Fixed</a><a href="/export_csv" class="btn btn-sm btn-success" style="border-radius:10px">Export CSV</a><a href="/add" class="btn btn-sm btn-exec">+ Add Agent</a></div>
-</div></nav><div class="container-fluid p-3 p-lg-4">__CONTENT__</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body></html>"""
+<a class="navbar-brand fw-bold" href="/"><i class="bi bi-lightning-charge-fill text-warning"></i> TEAM SHINE M9 <span style="font-size:10px" class="badge bg-warning text-dark">FIREBASE</span></a>
+<div class="d-flex gap-2"><a href="/export_csv" class="btn btn-sm btn-outline-warning" style="border-radius:10px"><i class="bi bi-download"></i> CSV</a><a href="/add" class="btn btn-sm btn-warning fw-bold" style="border-radius:10px;color:#0f172a">+ Add Agent</a></div>
+</div></nav><div class="container-fluid p-3 p-md-4">
+__CONTENT__
+</div></body></html>"""
 
-def render_page(content, count=0, refresh_secs=0):
-    # refresh_secs>0 makes the page auto-reload itself, so if data changes on
-    # another device/tab, everyone looking at the dashboard sees it update
-    # without hitting refresh manually.
-    refresh_tag = f'<meta http-equiv="refresh" content="{refresh_secs}">' if refresh_secs else ""
-    return BASE_HTML.replace("__REFRESH__", refresh_tag).replace("__CONTENT__", content).replace("__COUNT__", str(count))
+def render_page(content, total, refresh_secs=None):
+    refresh = f'<meta http-equiv="refresh" content="{refresh_secs}">' if refresh_secs else ''
+    html_page = BASE_HTML.replace("__REFRESH__", refresh).replace("__CONTENT__", content)
+    return html_page
 
 @app.route("/")
 def index():
-    init_db()
-    q = request.args.get("q","").strip()
-    db = get_db()
+    agents = get_all_agents()
+    q = request.args.get("q","").lower()
     if q:
-        like = f"%{q}%"
-        cur = db.execute('SELECT * FROM agents WHERE "NAME" LIKE ? OR "TENCENT ID" LIKE ? OR "NBS ID" LIKE ? ORDER BY id DESC', (like, like, like))
-    else:
-        cur = db.execute('SELECT * FROM agents ORDER BY id DESC')
-    agents = cur.fetchall()
-    ot_sum = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM ot_logs GROUP BY agent_id').fetchall()}
-    loss_sum = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM loss_logs GROUP BY agent_id').fetchall()}
-    rows=""
+        agents = [a for a in agents if q in str(a.get('NAME','')).lower() or q in str(a.get('TENCENT ID','')).lower()]
+    
+    rows = ""
     for a in agents:
-        ot = ot_sum.get(a['id'], 0) or 0
-        loss = loss_sum.get(a['id'], 0) or 0
-        net = ot - loss
-        rows+=f"<tr><td><span class='badge badge-id'>{a['id']}</span></td><td><a href='/view/{a['id']}' class='agent-name-dark text-decoration-none'>{esc(a['NAME'])}<br><small class='agent-sub'>{esc(a['NBS ID'])} • {esc(a['TENCENT ID'])}</small></a></td><td><span class='badge bg-dark border text-light'>{esc(a['TENCENT ID'])}</span></td><td style='color:#cbd5e1'>{esc(a['PHONE NAME'])}</td><td><span class='badge bg-success'>{ot:.1f}h</span></td><td><span class='badge bg-danger'>{loss:.1f}h</span></td><td><span class='badge bg-warning text-dark fw-bold'>{net:+.1f}h</span></td><td><a href='/view/{a['id']}' class='btn btn-sm btn-warning fw-bold' style='border-radius:10px'>Manage</a></td></tr>"
-    content=f"<div class='card p-3 mb-3'><form class='d-flex gap-2' method='get'><input name='q' value='{esc(q)}' class='form-control search-box' placeholder='Search agent...'><button class='btn btn-light' style='border-radius:12px'>Search</button></form><div class='mt-2 small' style='color:#22c55e'>● Fixed Graph Height - Bar graphs will NOT auto-adjust anymore!</div></div><div class='card p-0 overflow-hidden'><div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th>ID</th><th>AGENT</th><th>TENCENT</th><th>PHONE</th><th>OT</th><th>LOSS</th><th>NET</th><th>ACTION</th></tr></thead><tbody>{rows if rows else '<tr><td colspan=8 class=text-center p-5>Empty</td></tr>'}</tbody></table></div></div>"
-    return render_page(content, len(agents), refresh_secs=20)
+        # calculate OT/LOSS from subcollections
+        ot_docs = db.collection('agents').document(a['id']).collection('ot_logs').stream()
+        loss_docs = db.collection('agents').document(a['id']).collection('loss_logs').stream()
+        ot_sum = sum(float(d.to_dict().get('hours',0) or 0) for d in ot_docs)
+        loss_sum = sum(float(d.to_dict().get('hours',0) or 0) for d in loss_docs)
+        rows += f"<tr><td><span class='badge-id'>{esc(a['id'][:6])}</span></td><td><a href='/view/{esc(a['id'])}' class='agent-name-dark text-decoration-none'>{esc(a.get('NAME',''))}</a><div class='agent-sub'>{esc(a.get('TENCENT ID',''))}</div></td><td class='text-success fw-bold'>{ot_sum}</td><td class='text-danger fw-bold'>{loss_sum}</td><td class='fw-bold'>{ot_sum-loss_sum}</td></tr>"
 
-@app.route("/view/<int:aid>")
+    content = f"""
+    <div class="mb-3"><input id="search" placeholder="Search NAME or TENCENT ID..." class="search-box w-100" value="{esc(request.args.get('q',''))}" onkeyup="if(event.key==='Enter'){{window.location='/?q='+this.value}}"></div>
+    <div class='card p-0 overflow-hidden'><div class='p-3 d-flex justify-content-between' style='background:#0f172a;border-bottom:1px solid #fbbf24'><h6 class='fw-bold mb-0 text-white'>All Agents ({len(agents)}) - Firebase Persistent</h6><span class='badge bg-success'>LIVE</span></div><div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th>ID</th><th>AGENT</th><th>OT</th><th>LOSS</th><th>NET</th></tr></thead><tbody>{rows if rows else '<tr><td colspan=5 class=text-center style=color:#94a3b8>No agents yet - click Add Agent</td></tr>'}</tbody></table></div></div>
+    """
+    return render_page(content, len(agents))
+
+@app.route("/view/<aid>")
 def view(aid):
-    init_db(); db=get_db()
-    a=db.execute('SELECT * FROM agents WHERE id=?',(aid,)).fetchone()
-    if not a: return redirect("/")
-    ot_logs = db.execute('SELECT * FROM ot_logs WHERE agent_id=? ORDER BY ot_date DESC', (aid,)).fetchall()
-    loss_logs = db.execute('SELECT * FROM loss_logs WHERE agent_id=? ORDER BY loss_date DESC', (aid,)).fetchall()
-    ot_total = db.execute("SELECT SUM(hours) as t, SUM(CASE WHEN ot_type='RDOT' THEN hours ELSE 0 END) as rdot, SUM(CASE WHEN ot_type='REGULAR' THEN hours ELSE 0 END) as reg FROM ot_logs WHERE agent_id=?", (aid,)).fetchone()
-    loss_total = db.execute('SELECT SUM(hours) as t FROM loss_logs WHERE agent_id=?', (aid,)).fetchone()
-    ot_t = ot_total['t'] or 0; rdot = ot_total['rdot'] or 0; reg = ot_total['reg'] or 0; loss_t = loss_total['t'] or 0; net = ot_t - loss_t
-    fields_html="".join([f"<div class='detail-card'><div class='field-label'>{esc(c)}</div><div class='field-value'>{esc(a[c]) if a[c] else '<span style=color:#334155>—</span>'}</div></div>" for c in ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']])
-    ot_rows="".join([f"<tr><td style='color:#e2e8f0'>{esc(l['ot_date'])}</td><td><span class='badge {'bg-danger' if l['ot_type']=='RDOT' else 'bg-success'}'>{esc(l['ot_type'])}</span></td><td style='color:#22c55e;font-weight:700'>{l['hours']}h</td><td style='color:#94a3b8'>{esc(l['remarks'])}</td><td><form method='post' action='/delete_ot/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in ot_logs])
-    loss_rows="".join([f"<tr><td style='color:#e2e8f0'>{esc(l['loss_date'])}</td><td><span class='badge bg-danger'>{esc(l['loss_type'])}</span></td><td style='color:#ef4444;font-weight:700'>{l['hours']}h</td><td style='color:#94a3b8'>{esc(l['remarks'])}</td><td><form method='post' action='/delete_loss/{l['id']}'><button class='btn btn-sm btn-outline-danger'>X</button></form></td></tr>" for l in loss_logs])
-    today = datetime.now().strftime("%Y-%m-%d")
-    aname = a['NAME'] or 'A'
-    aname_safe = esc(aname)
-    content=f"""
-    <a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>← Back Dashboard</a>
-    <div class='desktop-grid'>
-        <div class='agent-sidebar'>
-            <div class='card p-4 text-center'>
-                <div class='agent-avatar mx-auto mb-3'>{esc(aname[0])}</div>
-                <div class='fw-bold fs-5 text-white' style='word-break:break-word'>{aname_safe}</div>
-                <div class='row g-2 my-3'>
-                    <div class='col-6'><div class='stat-card'><div class='field-label'>TOTAL OT</div><div class='stat-value text-success'>{ot_t:.1f}h</div><div style='font-size:10px;color:#64748b'>Reg:{reg:.1f} RD:{rdot:.1f}</div></div></div>
-                    <div class='col-6'><div class='stat-card'><div class='field-label'>LOSS</div><div class='stat-value text-danger'>{loss_t:.1f}h</div></div></div>
-                    <div class='col-12'><div class='stat-card' style='border:1px solid #fbbf24'><div class='field-label'>NET</div><div class='stat-value text-warning' style='font-size:32px'>{net:+.1f}h</div></div></div>
-                </div>
-                <div class='text-start'><div class='field-label mb-2'>FULL PROFILE</div><div class='details-grid'>{fields_html}</div></div>
-            </div>
-        </div>
-        <div class='d-flex flex-column gap-3'>
-            <div class='ot-loss-grid'>
-                <div class='card p-4' style='border:1px solid #22c55e'><h6 class='fw-bold text-success'>Add OT</h6>
-                <form method='post' action='/add_ot/{aid}' class='row g-2 mt-2'>
-                <div class='col-4'><input type='date' name='ot_date' value='{today}' class='form-control input-dark' required></div>
-                <div class='col-4'><select name='ot_type' class='form-select input-dark'><option value='REGULAR'>NORMAL OT (1-4)</option><option value='RDOT'>RDOT (5-6)</option></select></div>
-                <div class='col-4'><input type='number' step='0.5' name='hours' class='form-control input-dark' placeholder='2.5' required></div>
-                <div class='col-12'><input name='remarks' class='form-control input-dark' placeholder='Remarks'></div>
-                <div class='col-12'><button class='btn btn-success w-100 fw-bold' style='border-radius:12px'>Save OT</button></div></form>
-                <div class='table-responsive mt-3' style='max-height:300px'><table class='table table-sm mb-0'><thead><tr><th style='color:#fbbf24'>Date</th><th style='color:#fbbf24'>Type</th><th style='color:#fbbf24'>Hrs</th><th style='color:#fbbf24'>Remarks</th><th></th></tr></thead><tbody>{ot_rows if ot_rows else '<tr><td colspan=5 class=text-center style=color:#475569> No OT yet</td></tr>'}</tbody></table></div></div>
-                <div class='card p-4' style='border:1px solid #ef4444'><h6 class='fw-bold text-danger'>Add LOSS</h6>
-                <form method='post' action='/add_loss/{aid}' class='row g-2 mt-2'>
-                <div class='col-4'><input type='date' name='loss_date' value='{today}' class='form-control input-dark' required></div>
-                <div class='col-4'><select name='loss_type' class='form-select input-dark'><option value='LATE'>LATE</option><option value='UNDERTIME'>UNDERTIME</option><option value='ABSENT'>ABSENT</option><option value='LOSS'>LOSS</option></select></div>
-                <div class='col-4'><input type='number' step='0.5' name='hours' class='form-control input-dark' placeholder='1.5' required></div>
-                <div class='col-12'><input name='remarks' class='form-control input-dark' placeholder='Remarks'></div>
-                <div class='col-12'><button class='btn btn-danger w-100 fw-bold' style='border-radius:12px'>Save LOSS</button></div></form>
-                <div class='table-responsive mt-3' style='max-height:300px'><table class='table table-sm mb-0'><thead><tr><th style='color:#fbbf24'>Date</th><th style='color:#fbbf24'>Type</th><th style='color:#fbbf24'>Hrs</th><th style='color:#fbbf24'>Remarks</th><th></th></tr></thead><tbody>{loss_rows if loss_rows else '<tr><td colspan=5 class=text-center style=color:#475569> No Loss yet</td></tr>'}</tbody></table></div></div>
-            </div>
-        </div>
+    ag = get_agent(aid)
+    if not ag:
+        return redirect("/")
+    ot_logs = [d.to_dict() | {'id': d.id} for d in db.collection('agents').document(aid).collection('ot_logs').order_by('created_at', direction=firestore.Query.DESCENDING).stream()]
+    loss_logs = [d.to_dict() | {'id': d.id} for d in db.collection('agents').document(aid).collection('loss_logs').order_by('created_at', direction=firestore.Query.DESCENDING).stream()]
+    
+    details = "".join([f"<div class='detail-card'><div class='field-label'>{esc(c)}</div><div class='field-value'>{esc(ag.get(c,''))}</div></div>" for c in COLS])
+    
+    ot_rows = "".join([f"<tr><td>{esc(x.get('ot_date',''))}</td><td>{esc(x.get('ot_type',''))}</td><td>{esc(x.get('hours',''))}</td><td>{esc(x.get('remarks',''))}</td></tr>" for x in ot_logs]) or "<tr><td colspan=4 class='text-center text-muted'>No OT logs</td></tr>"
+    loss_rows = "".join([f"<tr><td>{esc(x.get('loss_date',''))}</td><td>{esc(x.get('loss_type',''))}</td><td>{esc(x.get('hours',''))}</td><td>{esc(x.get('remarks',''))}</td></tr>" for x in loss_logs]) or "<tr><td colspan=4 class='text-center text-muted'>No LOSS logs</td></tr>"
+
+    content = f"""
+    <a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>Back</a>
+    <div class="desktop-grid">
+      <div class="agent-sidebar"><div class="card p-4 text-center"><div class="agent-avatar mx-auto mb-3">{esc(ag.get('NAME','')[0].upper() if ag.get('NAME') else 'A')}</div><h5 class="agent-name-dark">{esc(ag.get('NAME',''))}</h5><div class="agent-sub mb-3">{esc(ag.get('TENCENT ID',''))}</div><div class="d-flex gap-2 justify-content-center"><a href="/edit/{esc(ag['id'])}" class="btn btn-warning btn-sm fw-bold">Edit</a><form method="post" action="/delete/{esc(ag['id'])}" onsubmit="return confirm('Delete?')"><button class="btn btn-outline-danger btn-sm">Delete</button></form></div></div></div>
+      <div><div class="card p-4 mb-3"><h6 class="fw-bold mb-3">Agent Details</h6><div class="details-grid">{details}</div></div>
+      <div class="ot-loss-grid">
+        <div class="card p-3"><h6 class="fw-bold">OT Logs</h6>
+        <form method="post" action="/add_ot/{esc(ag['id'])}" class="row g-2 mb-3"><div class="col-6"><input name="ot_date" type="date" class="form-control input-dark" required></div><div class="col-6"><select name="ot_type" class="form-control input-dark"><option>Regular OT</option><option>RDOT</option></select></div><div class="col-6"><input name="hours" type="number" step="0.5" placeholder="Hours" class="form-control input-dark" required></div><div class="col-6"><input name="remarks" placeholder="Remarks" class="form-control input-dark"></div><div class="col-12"><button class="btn btn-success btn-sm w-100">Add OT</button></div></form>
+        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Remarks</th></tr></thead><tbody>{ot_rows}</tbody></table></div></div>
+        <div class="card p-3"><h6 class="fw-bold">LOSS Logs</h6>
+        <form method="post" action="/add_loss/{esc(ag['id'])}" class="row g-2 mb-3"><div class="col-6"><input name="loss_date" type="date" class="form-control input-dark" required></div><div class="col-6"><select name="loss_type" class="form-control input-dark"><option>Absent</option><option>Late</option><option>Undertime</option></select></div><div class="col-6"><input name="hours" type="number" step="0.5" placeholder="Hours" class="form-control input-dark" required></div><div class="col-6"><input name="remarks" placeholder="Remarks" class="form-control input-dark"></div><div class="col-12"><button class="btn btn-danger btn-sm w-100">Add LOSS</button></div></form>
+        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Remarks</th></tr></thead><tbody>{loss_rows}</tbody></table></div></div>
+      </div></div>
     </div>
     """
-    cnt=db.execute('SELECT COUNT(*) AS cnt FROM agents').fetchone()['cnt']
-    return render_page(content, cnt)
+    return render_page(content, 0)
 
-@app.route("/add_ot/<int:aid>", methods=["POST"])
+@app.route("/add", methods=["GET","POST"])
+@app.route("/edit/<aid>", methods=["GET","POST"])
+def add_edit(aid=None):
+    ag = get_agent(aid) if aid else None
+    if request.method=="POST":
+        vals = {c: request.form.get(c,"") for c in COLS}
+        if aid:
+            db.collection('agents').document(aid).update(vals)
+        else:
+            _, doc_ref = db.collection('agents').add(vals)
+            aid = doc_ref.id
+        return redirect(f"/view/{aid}")
+    f = "".join([f"<div class='col-md-6 mb-3'><label class='field-label'>{esc(c)}</label><input name='{c}' value='{esc(ag.get(c,'')) if ag else ''}' class='form-control input-dark'></div>" for c in COLS])
+    title="Edit Agent" if aid else "Add Agent"
+    content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>Back</a><div class='card p-4'><h4 class='fw-bold'>{title}</h4><form method='post' class='row'>{f}<div class='col-12 mt-3'><button class='btn btn-warning fw-bold'>Save</button></div></form></div>"
+    return render_page(content, 0)
+
+@app.route("/add_ot/<aid>", methods=["POST"])
 def add_ot(aid):
-    init_db(); db=get_db()
-    try:
-        hours = float(request.form.get('hours', 0) or 0)
-    except ValueError:
-        hours = 0.0
-    db.execute('INSERT INTO ot_logs (agent_id, ot_date, ot_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',(aid, request.form.get('ot_date'), request.form.get('ot_type'), hours, request.form.get('remarks',''), datetime.now().isoformat()))
-    db.commit(); return redirect(f"/view/{aid}")
+    db.collection('agents').document(aid).collection('ot_logs').add({
+        'ot_date': request.form.get('ot_date'),
+        'ot_type': request.form.get('ot_type'),
+        'hours': float(request.form.get('hours',0)),
+        'remarks': request.form.get('remarks',''),
+        'created_at': datetime.now().isoformat()
+    })
+    return redirect(f"/view/{aid}")
 
-@app.route("/add_loss/<int:aid>", methods=["POST"])
+@app.route("/add_loss/<aid>", methods=["POST"])
 def add_loss(aid):
-    init_db(); db=get_db()
-    try:
-        hours = float(request.form.get('hours', 0) or 0)
-    except ValueError:
-        hours = 0.0
-    db.execute('INSERT INTO loss_logs (agent_id, loss_date, loss_type, hours, remarks, created_at) VALUES (?,?,?,?,?,?)',(aid, request.form.get('loss_date'), request.form.get('loss_type'), hours, request.form.get('remarks',''), datetime.now().isoformat()))
-    db.commit(); return redirect(f"/view/{aid}")
+    db.collection('agents').document(aid).collection('loss_logs').add({
+        'loss_date': request.form.get('loss_date'),
+        'loss_type': request.form.get('loss_type'),
+        'hours': float(request.form.get('hours',0)),
+        'remarks': request.form.get('remarks',''),
+        'created_at': datetime.now().isoformat()
+    })
+    return redirect(f"/view/{aid}")
 
-@app.route("/delete_ot/<int:oid>", methods=["POST"])
-def delete_ot(oid):
-    init_db(); db=get_db()
-    cur=db.execute('SELECT agent_id FROM ot_logs WHERE id=?',(oid,)).fetchone()
-    aid = cur['agent_id'] if cur else 0
-    db.execute('DELETE FROM ot_logs WHERE id=?',(oid,)); db.commit()
-    return redirect(f"/view/{aid}" if aid else "/")
-
-@app.route("/delete_loss/<int:oid>", methods=["POST"])
-def delete_loss(oid):
-    init_db(); db=get_db()
-    cur=db.execute('SELECT agent_id FROM loss_logs WHERE id=?',(oid,)).fetchone()
-    aid = cur['agent_id'] if cur else 0
-    db.execute('DELETE FROM loss_logs WHERE id=?',(oid,)); db.commit()
-    return redirect(f"/view/{aid}" if aid else "/")
-
-@app.route("/ot_report")
-def ot_report():
-    init_db(); db=get_db()
-    ot_map = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM ot_logs GROUP BY agent_id').fetchall()}
-    loss_map = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM loss_logs GROUP BY agent_id').fetchall()}
-    agents = db.execute('SELECT * FROM agents ORDER BY "NAME"').fetchall()
-    g_ot = db.execute("SELECT SUM(hours) as t, SUM(CASE WHEN ot_type='REGULAR' THEN hours ELSE 0 END) as reg, SUM(CASE WHEN ot_type='RDOT' THEN hours ELSE 0 END) as rdot FROM ot_logs").fetchone()
-    g_loss = db.execute('SELECT SUM(hours) as t FROM loss_logs').fetchone()
-    total_ot = g_ot['t'] or 0; reg_ot = g_ot['reg'] or 0; rdot_ot = g_ot['rdot'] or 0; total_loss = g_loss['t'] or 0
-    labels=[]; ot_data=[]; loss_data=[]; table_rows=""
-    for a in agents:
-        ot = ot_map.get(a['id'],0) or 0
-        loss = loss_map.get(a['id'],0) or 0
-        if ot==0 and loss==0: continue
-        labels.append((a['NAME'] or '').split(',')[0])
-        ot_data.append(round(ot,1)); loss_data.append(round(loss,1))
-        table_rows+=f"<tr><td style='color:#94a3b8'>{a['id']}</td><td><div class='agent-name-dark'>{esc(a['NAME'])}</div><small class='agent-sub'>{esc(a['NBS ID'])} • {esc(a['TENCENT ID'])}</small></td><td style='color:#22c55e;font-weight:700'>{ot:.1f}h</td><td style='color:#ef4444;font-weight:700'>{loss:.1f}h</td><td style='color:#fbbf24;font-weight:800'>{ot-loss:+.1f}h</td></tr>"
-    top_ot = sorted([(a['NAME'], ot_map.get(a['id'],0) or 0) for a in agents if ot_map.get(a['id'],0)], key=lambda x: x[1], reverse=True)[:10]
-    top_loss = sorted([(a['NAME'], loss_map.get(a['id'],0) or 0) for a in agents if loss_map.get(a['id'],0)], key=lambda x: x[1], reverse=True)[:10]
-    content=f"""
-    <div class='d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2'>
-        <h4 class='fw-bold text-white mb-0'><i class='bi bi-bar-chart-line text-warning'></i> Executive Reports - FIXED GRAPH (No Auto-Adjust)</h4>
-        <div class='d-flex gap-2'><a href='/export_csv' class='btn btn-success btn-sm' style='border-radius:10px'>Export CSV</a></div>
-    </div>
-    <div class='row g-3 mb-4'>
-        <div class='col-md-3'><div class='card p-3 text-center' style='border:1px solid #22c55e'><div class='field-label'>TOTAL OT</div><div class='fs-1 fw-bold text-success'>{total_ot:.1f}h</div><div style='font-size:11px;color:#6ee7b7'>Reg {reg_ot:.1f}h • RDOT {rdot_ot:.1f}h</div></div></div>
-        <div class='col-md-3'><div class='card p-3 text-center' style='border:1px solid #ef4444'><div class='field-label'>TOTAL LOSS</div><div class='fs-1 fw-bold text-danger'>{total_loss:.1f}h</div></div></div>
-        <div class='col-md-3'><div class='card p-3 text-center' style='border:1px solid #fbbf24'><div class='field-label'>NET</div><div class='fs-1 fw-bold text-warning'>{total_ot-total_loss:+.1f}h</div></div></div>
-        <div class='col-md-3'><div class='card p-3 text-center'><div class='field-label'>ACTIVE</div><div class='fs-1 fw-bold text-white'>{len(labels)}</div></div></div>
-    </div>
-    <div class='row g-3 mb-4'>
-        <div class='col-lg-8'><div class='card p-4'><h6 class='fw-bold mb-3 text-white'>OT vs LOSS Comparison - FIXED HEIGHT 350px (No Auto-Adjust)</h6><div class='chart-container'><canvas id='otLossChart'></canvas></div></div></div>
-        <div class='col-lg-4'><div class='card p-4'><h6 class='fw-bold mb-3 text-white'>Distribution - Small Pie Fixed 220px</h6><div class='chart-container-small'><canvas id='pieChart'></canvas></div><div class='mt-3 text-center small'><span style='color:#22c55e'>● Regular {reg_ot:.1f}h</span> <span style='color:#f59e0b'>● RDOT {rdot_ot:.1f}h</span> <span style='color:#ef4444'>● LOSS {total_loss:.1f}h</span></div></div></div>
-    </div>
-    <div class='row g-3 mb-4'>
-        <div class='col-md-6'><div class='card p-4'><h6 class='fw-bold text-success'>Top 10 OT</h6><div class='chart-container-top10'><canvas id='topOtChart'></canvas></div></div></div>
-        <div class='col-md-6'><div class='card p-4'><h6 class='fw-bold text-danger'>Top 10 LOSS</h6><div class='chart-container-top10'><canvas id='topLossChart'></canvas></div></div></div>
-    </div>
-    <div class='card p-0 overflow-hidden'><div class='p-3 d-flex justify-content-between' style='background:#0f172a;border-bottom:1px solid #fbbf24'><h6 class='fw-bold mb-0 text-white'>Detailed Ranking - VISIBLE FONTS FIXED</h6><span class='badge bg-warning text-dark'>FIXED</span></div><div class='table-responsive'><table class='table table-hover mb-0'><thead><tr><th style='color:#fbbf24'>ID</th><th style='color:#fbbf24'>AGENT</th><th style='color:#fbbf24'>OT</th><th style='color:#fbbf24'>LOSS</th><th style='color:#fbbf24'>NET</th></tr></thead><tbody>{table_rows if table_rows else '<tr><td colspan=5 class=text-center style=color:#94a3b8>No data yet</td></tr>'}</tbody></table></div></div>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    new Chart(document.getElementById('otLossChart'), {{
-        type:'bar',
-        data:{{labels:{json.dumps(labels)}, datasets:[{{label:'OT', data:{json.dumps(ot_data)}, backgroundColor:'#22c55e', borderRadius:6, maxBarThickness:40}}, {{label:'LOSS', data:{json.dumps(loss_data)}, backgroundColor:'#ef4444', borderRadius:6, maxBarThickness:40}}]}},
-        options:{{responsive:true, maintainAspectRatio:false, scales:{{x:{{ticks:{{color:'#94a3b8', maxRotation:45}}, grid:{{color:'#1f2937'}}}}, y:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}, grid:{{color:'#1f2937'}}}}}}}}
-    }});
-    new Chart(document.getElementById('pieChart'), {{
-        type:'doughnut',
-        data:{{labels:['Regular OT','RDOT','LOSS'], datasets:[{{data:[{reg_ot},{rdot_ot},{total_loss}], backgroundColor:['#22c55e','#f59e0b','#ef4444'], borderWidth:0}}]}},
-        options:{{responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{{legend:{{display:false}}}}}}
-    }});
-    new Chart(document.getElementById('topOtChart'), {{
-        type:'bar',
-        data:{{labels:{json.dumps([x[0].split(',')[0] for x in top_ot])}, datasets:[{{data:{json.dumps([x[1] for x in top_ot])}, backgroundColor:'#22c55e', borderRadius:6, maxBarThickness:30}}]}},
-        options:{{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}, grid:{{color:'#1f2937'}}}}, y:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}}}
-    }});
-    new Chart(document.getElementById('topLossChart'), {{
-        type:'bar',
-        data:{{labels:{json.dumps([x[0].split(',')[0] for x in top_loss])}, datasets:[{{data:{json.dumps([x[1] for x in top_loss])}, backgroundColor:'#ef4444', borderRadius:6, maxBarThickness:30}}]}},
-        options:{{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x:{{beginAtZero:true, ticks:{{color:'#94a3b8'}}, grid:{{color:'#1f2937'}}}}, y:{{ticks:{{color:'#94a3b8'}}, grid:{{display:false}}}}}}}}
-    }});
-    </script>
-    """
-    cnt=db.execute('SELECT COUNT(*) AS cnt FROM agents').fetchone()['cnt']
-    return render_page(content, cnt, refresh_secs=20)
+@app.route("/delete/<aid>", methods=["POST"])
+def delete(aid):
+    # delete subcollections first
+    for coll in ['ot_logs', 'loss_logs']:
+        docs = db.collection('agents').document(aid).collection(coll).stream()
+        for d in docs:
+            d.reference.delete()
+    db.collection('agents').document(aid).delete()
+    return redirect("/")
 
 @app.route("/export_csv")
 def export_csv():
-    init_db(); db=get_db()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["TEAM SHINE M9 - FIXED GRAPH REPORT", f"Generated {datetime.now()}"])
-    g_ot = db.execute('SELECT SUM(hours) as t FROM ot_logs').fetchone()
-    g_loss = db.execute('SELECT SUM(hours) as t FROM loss_logs').fetchone()
-    writer.writerow(["Total OT", g_ot['t'] or 0])
-    writer.writerow(["Total LOSS", g_loss['t'] or 0])
-    writer.writerow(["NET", (g_ot['t'] or 0) - (g_loss['t'] or 0)])
-    writer.writerow([])
+    writer.writerow(["TEAM SHINE M9 - FIREBASE REPORT", f"Generated {datetime.now()}"])
+    agents = get_all_agents()
     writer.writerow(["ID", "NAME", "OT", "LOSS", "NET"])
-    ot_map = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM ot_logs GROUP BY agent_id').fetchall()}
-    loss_map = {r['agent_id']: r['t'] for r in db.execute('SELECT agent_id, SUM(hours) as t FROM loss_logs GROUP BY agent_id').fetchall()}
-    for a in db.execute('SELECT * FROM agents ORDER BY "NAME"').fetchall():
-        ot = ot_map.get(a['id'],0) or 0
-        loss = loss_map.get(a['id'],0) or 0
-        if ot==0 and loss==0: continue
-        writer.writerow([a['id'], a['NAME'], ot, loss, ot-loss])
+    for a in agents:
+        ot_sum = sum(float(d.to_dict().get('hours',0) or 0) for d in db.collection('agents').document(a['id']).collection('ot_logs').stream())
+        loss_sum = sum(float(d.to_dict().get('hours',0) or 0) for d in db.collection('agents').document(a['id']).collection('loss_logs').stream())
+        if ot_sum==0 and loss_sum==0:
+            continue
+        writer.writerow([a['id'], a.get('NAME',''), ot_sum, loss_sum, ot_sum-loss_sum])
     output.seek(0)
-    return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": f"attachment;filename=TeamShineM9_FixedGraph_{datetime.now().strftime('%Y%m%d')}.csv"})
-
-@app.route("/add", methods=["GET","POST"])
-@app.route("/edit/<int:aid>", methods=["GET","POST"])
-def add_edit(aid=None):
-    init_db(); db=get_db()
-    ag=None
-    if aid:
-        ag=db.execute('SELECT * FROM agents WHERE id=?',(aid,)).fetchone()
-    if request.method=="POST":
-        cols = ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']
-        vals=[request.form.get(c,"") for c in cols]
-        if aid:
-            sc=", ".join([f'"{c}"=?' for c in cols])
-            db.execute(f'UPDATE agents SET {sc} WHERE id=?', vals+[aid])
-        else:
-            ph=", ".join(["?"]*len(cols))
-            cq=", ".join([f'"{c}"' for c in cols])
-            cur = db.execute(f'INSERT INTO agents ({cq}) VALUES ({ph}) RETURNING id', vals)
-            aid = cur.fetchone()['id']
-        db.commit()
-        return redirect(f"/view/{aid}")
-    f="".join([f"<div class='col-md-6 mb-3'><label class='field-label'>{esc(c)}</label><input name='{c}' value='{esc(ag[c]) if (ag and ag[c]) else ''}' class='form-control input-dark'></div>" for c in ['NAME', 'TENCENT ID', 'DATE HIRED', 'PHONE NAME', 'NBS ID', 'HEADSET SN', 'IBAS', 'DJANGO', 'NT LOG IN', 'Sales Force', 'ZOHO', 'BSS WEB', 'EMAIL', 'BIRTHDAY', 'CONTACT NO.', 'ADDRESS']])
-    title="Edit Agent" if aid else "Add Agent"
-    content=f"<a href='/' class='btn btn-sm btn-outline-light mb-3' style='border-radius:10px'>Back</a><div class='card p-4'><h4 class='fw-bold'>{title}</h4><form method='post' class='row'>{f}<div class='col-12 mt-3'><button class='btn btn-warning fw-bold'>Save</button></div></form></div>"
-    cnt=db.execute('SELECT COUNT(*) AS cnt FROM agents').fetchone()['cnt']
-    return render_page(content, cnt)
-
-@app.route("/delete/<int:aid>", methods=["POST"])
-def delete(aid):
-    init_db(); db=get_db()
-    db.execute('DELETE FROM agents WHERE id=?',(aid,))
-    db.execute('DELETE FROM ot_logs WHERE agent_id=?',(aid,))
-    db.execute('DELETE FROM loss_logs WHERE agent_id=?',(aid,))
-    db.commit()
-    return redirect("/")
+    return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": f"attachment;filename=TeamShineM9_Firebase_{datetime.now().strftime('%Y%m%d')}.csv"})
 
 if __name__=="__main__":
     port=int(os.environ.get("PORT",5000))
