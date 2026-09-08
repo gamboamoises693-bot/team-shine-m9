@@ -382,14 +382,36 @@ def dashboard():
     html=alerts_html+filter_html
     html+=f"<div class='row g-2'><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL OT</div><div class='val-big' style='color:#22c55e'>{round(team_n,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY OT</div><div class='val-big' style='color:#3b82f6'>{round(team_r,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#fbbf24'>{round(team_tot,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS HRS</div><div class='val-big' style='color:#ef4444'>{round(team_loss,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #a855f7'><div class='label'>TEAM NET</div><div class='val-big' style='color:#a855f7'>+{round(team_tot-team_loss,1)}h</div></div></div><div class='col-6 col-md-2'><div class='kpi' style='border:1px solid #06b6d4'><div class='label'>AVG OT</div><div class='val-big' style='color:#06b6d4'>{round(avg_ot,1)}h</div></div></div></div>"
     
-    # Top 3
+
+    # Top 3 Ranking UI - Enhanced ViewCard
     top3=sorted(agent_stats, key=lambda x: x["tot"], reverse=True)[:3]
-    html+="<div class='card-dark mt-3' style='border:1px solid #fbbf24'><h6 style='color:#fbbf24'>Top 3 OT Earners</h6><div class='d-flex justify-content-center gap-2 mt-2'>"
+    top_qa=sorted([a for a in agent_stats if a["qa"]>0], key=lambda x: x["qa"], reverse=True)[:3]
+    top_csat=sorted([a for a in agent_stats if a["csat"]>0], key=lambda x: x["csat"], reverse=True)[:3]
+    html+="<div class='row g-2 mt-3'>"
+    html+="<div class='col-12 col-md-4'><div class='card-dark' style='border:1px solid #fbbf24;background:linear-gradient(135deg,#1e293b,#0f172a)'><h6 style='color:#fbbf24'>🏆 Top 3 OT Earners - Ranking UI</h6><div class='mt-3'>"
     for idx, a in enumerate(top3):
         medal="🥇" if idx==0 else "🥈" if idx==1 else "🥉"
-        html+=f"<div style='background:#1e293b;padding:8px 12px;border-radius:10px;text-align:center'><div>{medal}</div><div style='color:white;font-size:12px'>{a['name'][:10]}</div><div style='color:#fbbf24'>{a['tot']}h</div></div>"
-    html+="</div></div>"
-    
+        bg="#fbbf241a" if idx==0 else "#94a3b81a" if idx==1 else "#f973161a"
+        border="#fbbf24" if idx==0 else "#94a3b8" if idx==1 else "#f97316"
+        html+=f"<div style='background:{bg};border:1px solid {border};padding:10px;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center'><div style='display:flex;align-items:center;gap:8px'><span style='font-size:20px'>{medal}</span><div><div style='color:white;font-weight:700;font-size:13px'>{a['name']}</div><small style='color:#94a3b8'>{a['tid']}</small></div></div><div style='text-align:right'><div style='color:#fbbf24;font-weight:800'>{a['tot']}h</div><small style='color:#94a3b8'>{round(a['pct'],0)}% target</small></div></div>"
+    html+="</div></div></div>"
+    html+="<div class='col-12 col-md-4'><div class='card-dark' style='border:1px solid #8b5cf6;background:linear-gradient(135deg,#1e1b4b,#0f172a)'><h6 style='color:#8b5cf6'>⭐ Top 3 QA - Ranking UI</h6><div class='mt-3'>"
+    if top_qa:
+        for idx, a in enumerate(top_qa):
+            medal="🥇" if idx==0 else "🥈" if idx==1 else "🥉"
+            html+=f"<div style='background:#8b5cf61a;border:1px solid #8b5cf6;padding:10px;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center'><div style='display:flex;align-items:center;gap:8px'><span style='font-size:20px'>{medal}</span><div><div style='color:white;font-weight:700;font-size:13px'>{a['name']}</div><small style='color:#94a3b8'>{a['tid']}</small></div></div><div style='text-align:right'><div style='color:#8b5cf6;font-weight:800'>{a['qa']}%</div><small style='color:#94a3b8'>QA</small></div></div>"
+    else:
+        html+="<div style='color:#64748b;text-align:center;padding:20px'>No QA data<br><small>Add QA logs</small></div>"
+    html+="</div></div></div>"
+    html+="<div class='col-12 col-md-4'><div class='card-dark' style='border:1px solid #06b6d4;background:linear-gradient(135deg,#083344,#0f172a)'><h6 style='color:#06b6d4'>😊 Top 3 CSAT - Ranking UI</h6><div class='mt-3'>"
+    if top_csat:
+        for idx, a in enumerate(top_csat):
+            medal="🥇" if idx==0 else "🥈" if idx==1 else "🥉"
+            html+=f"<div style='background:#06b6d41a;border:1px solid #06b6d4;padding:10px;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center'><div style='display:flex;align-items:center;gap:8px'><span style='font-size:20px'>{medal}</span><div><div style='color:white;font-weight:700;font-size:13px'>{a['name']}</div><small style='color:#94a3b8'>{a['tid']}</small></div></div><div style='text-align:right'><div style='color:#06b6d4;font-weight:800'>{a['csat']}%</div><small style='color:#94a3b8'>CSAT</small></div></div>"
+    else:
+        html+="<div style='color:#64748b;text-align:center;padding:20px'>No CSAT data<br><small>Add CSAT logs</small></div>"
+    html+="</div></div></div></div>"
+    # Charts
     # Charts
     html+=f"""
     <div class="row g-3 mt-3">
@@ -503,6 +525,104 @@ def view(aid):
     risk_color="#22c55e" if risk=="Low" else "#fbbf24" if risk=="Moderate" else "#f97316" if risk=="High" else "#ef4444"
     html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'><div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div><h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"
     html+=f"<div class='row g-2 mt-3'><div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL</div><div class='val-big' style='color:#22c55e'>{n}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY</div><div class='val-big' style='color:#3b82f6'>{r}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS</div><div class='val-big' style='color:#ef4444'>{loss}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>{tot}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET</div><div class='val-big' style='color:#fbbf24'>+{net}h</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f97316;min-height:80px;height:80px'><div class='label'>AHT</div><div class='val-big' style='font-size:16px;color:#f97316'>{la}m</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #8b5cf6;min-height:80px;height:80px'><div class='label'>QA</div><div class='val-big' style='font-size:16px;color:#8b5cf6'>{lq}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #06b6d4;min-height:80px;height:80px'><div class='label'>CSAT</div><div class='val-big' style='font-size:16px;color:#06b6d4'>{lc}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f59e0b;min-height:80px;height:80px'><div class='label'>FCR</div><div class='val-big' style='font-size:16px;color:#f59e0b'>{lf}%</div></div></div></div>"
+
+    # ViewCard AHT QA - Enhanced
+    aht_status = "Good" if la<=7 and la>0 else "Warning" if la<=10 and la>0 else "Critical" if la>10 else "No data"
+    aht_color = "#22c55e" if aht_status=="Good" else "#fbbf24" if aht_status=="Warning" else "#ef4444" if aht_status=="Critical" else "#64748b"
+    qa_status = "Excellent" if lq>=90 else "Good" if lq>=75 else "Needs Improvement" if lq>0 else "No data"
+    qa_color = "#22c55e" if qa_status=="Excellent" else "#fbbf24" if qa_status=="Good" else "#ef4444" if qa_status=="Needs Improvement" else "#64748b"
+    csat_status = "Excellent" if lc>=90 else "Good" if lc>=85 else "Needs Improvement" if lc>0 else "No data"
+    csat_color = "#22c55e" if csat_status=="Excellent" else "#fbbf24" if csat_status=="Good" else "#ef4444" if csat_status=="Needs Improvement" else "#64748b"
+    fcr_status = "Excellent" if lf>=75 else "Good" if lf>=70 else "Needs Improvement" if lf>0 else "No data"
+    fcr_color = "#22c55e" if fcr_status=="Excellent" else "#fbbf24" if fcr_status=="Good" else "#ef4444" if fcr_status=="Needs Improvement" else "#64748b"
+
+    html+=f"""
+    <div class="row g-3 mt-3">
+      <div class="col-12 col-md-6">
+        <div class="card-dark" style="border:2px solid #f97316;background:linear-gradient(135deg,#431407,#0f172a);min-height:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 style="color:#f97316;margin:0">⏱️ AHT ViewCard</h6>
+            <span class="badge" style="background:{aht_color};font-size:10px">{aht_status}</span>
+          </div>
+          <div class="row mt-3">
+            <div class="col-6 text-center" style="border-right:1px solid #334155">
+              <div style="color:#94a3b8;font-size:10px">Latest AHT</div>
+              <div style="color:#f97316;font-size:36px;font-weight:900">{la}<small style="font-size:14px">m</small></div>
+              <small style="color:#94a3b8">Target ≤7m Good</small>
+            </div>
+            <div class="col-6 text-center">
+              <div style="color:#94a3b8;font-size:10px">Average AHT</div>
+              <div style="color:white;font-size:28px;font-weight:800">{round(aa,1)}<small style="font-size:12px">m</small></div>
+              <small style="color:#94a3b8">All logs avg</small>
+              <div class="mt-2"><small style="color:{aht_color};font-size:11px">Industry 6m 3s avg</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="card-dark" style="border:2px solid #8b5cf6;background:linear-gradient(135deg,#2e1065,#0f172a);min-height:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 style="color:#8b5cf6;margin:0">⭐ QA ViewCard</h6>
+            <span class="badge" style="background:{qa_color};font-size:10px">{qa_status}</span>
+          </div>
+          <div class="row mt-3">
+            <div class="col-6 text-center" style="border-right:1px solid #334155">
+              <div style="color:#94a3b8;font-size:10px">Latest QA</div>
+              <div style="color:#8b5cf6;font-size:36px;font-weight:900">{lq}<small style="font-size:14px">%</small></div>
+              <small style="color:#94a3b8">Target 90%+ Excellent</small>
+            </div>
+            <div class="col-6 text-center">
+              <div style="color:#94a3b8;font-size:10px">Average QA</div>
+              <div style="color:white;font-size:28px;font-weight:800">{round(qa,1)}<small style="font-size:12px">%</small></div>
+              <small style="color:#94a3b8">All logs avg</small>
+              <div class="mt-2"><small style="color:{qa_color};font-size:11px">Industry 75-90% standard</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="card-dark" style="border:2px solid #06b6d4;background:linear-gradient(135deg,#083344,#0f172a);min-height:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 style="color:#06b6d4;margin:0">😊 CSAT ViewCard</h6>
+            <span class="badge" style="background:{csat_color};font-size:10px">{csat_status}</span>
+          </div>
+          <div class="row mt-3">
+            <div class="col-6 text-center" style="border-right:1px solid #334155">
+              <div style="color:#94a3b8;font-size:10px">Latest CSAT</div>
+              <div style="color:#06b6d4;font-size:36px;font-weight:900">{lc}<small style="font-size:14px">%</small></div>
+              <small style="color:#94a3b8">Target 85%+ Good</small>
+            </div>
+            <div class="col-6 text-center">
+              <div style="color:#94a3b8;font-size:10px">Average CSAT</div>
+              <div style="color:white;font-size:28px;font-weight:800">{round(ac,1)}<small style="font-size:12px">%</small></div>
+              <small style="color:#94a3b8">All logs avg</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="card-dark" style="border:2px solid #f59e0b;background:linear-gradient(135deg,#451a03,#0f172a);min-height:160px">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 style="color:#f59e0b;margin:0">✅ FCR ViewCard</h6>
+            <span class="badge" style="background:{fcr_color};font-size:10px">{fcr_status}</span>
+          </div>
+          <div class="row mt-3">
+            <div class="col-6 text-center" style="border-right:1px solid #334155">
+              <div style="color:#94a3b8;font-size:10px">Latest FCR</div>
+              <div style="color:#f59e0b;font-size:36px;font-weight:900">{lf}<small style="font-size:14px">%</small></div>
+              <small style="color:#94a3b8">Target 70-75%</small>
+            </div>
+            <div class="col-6 text-center">
+              <div style="color:#94a3b8;font-size:10px">Average FCR</div>
+              <div style="color:white;font-size:28px;font-weight:800">{round(af,1)}<small style="font-size:12px">%</small></div>
+              <small style="color:#94a3b8">All logs avg</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+
     html+=f"""<div class="row g-3 mt-3"><div class="col-12 col-md-6"><div class="chart-card"><h6 style="color:#fbbf24">OT Trend</h6><canvas id="indOT"></canvas></div></div><div class="col-12 col-md-6"><div class="chart-card"><h6 style="color:#8b5cf6">QA/CSAT/FCR/AHT</h6><canvas id="indQA"></canvas></div></div></div><script>new Chart(document.getElementById('indOT'), {{type:'line', data:{{labels:{ind_labels}, datasets:[{{label:'OT', data:{ind_tot}, borderColor:'#fbbf24', backgroundColor:'#fbbf2433', fill:true, tension:0.4}},{{label:'Loss', data:{ind_loss}, borderColor:'#ef4444'}}]}}, options:{{responsive:true}}}}); new Chart(document.getElementById('indQA'), {{type:'line', data:{{labels:{ind_labels}, datasets:[{{label:'QA', data:{ind_qa}, borderColor:'#8b5cf6'}},{{label:'CSAT', data:{ind_csat}, borderColor:'#06b6d4'}},{{label:'FCR', data:{ind_fcr}, borderColor:'#f59e0b'}},{{label:'AHT', data:{ind_aht}, borderColor:'#f97316'}}]}}, options:{{responsive:true}}}});</script>"""
     html+=f"""<div class="card-dark mt-3" style="border:1px solid #334155"><div class="row g-2"><div class="col-6"><h6 style="color:#fbbf24">Target OT</h6><form method="POST" action="/set_target/{aid}" class="row g-2"><div class="col-6"><input name="target" type="number" step="0.5" class="form-control form-control-sm" value="{target}"></div><div class="col-6"><button class="btn btn-sm btn-warning w-100">Update OT</button></div></form></div><div class="col-6"><h6 style="color:#22c55e">WH Target 220h</h6><form method="POST" action="/set_working_hours/{aid}" class="row g-2"><div class="col-6"><input name="working_hours_target" type="number" step="1" class="form-control form-control-sm" value="{wh_target}"></div><div class="col-6"><button class="btn btn-sm btn-success w-100">Update WH</button></div></form></div></div></div>"""
     if session.get("role")=="admin":
