@@ -141,7 +141,7 @@ input,select{background:#0f172a!important;color:#f1f5f9!important;border:1px sol
 <a href="/leaderboard" class="btn btn-sm btn-outline-warning">🏆</a>
 <a href="/export" class="btn btn-sm btn-outline-light">📥</a>
 <a href="/bulk" class="btn btn-sm btn-outline-light">📤</a>
-<a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> 
+<a href="/logs" class="btn btn-sm btn-outline-light">📋 Logs</a> <a href="/agents" class="btn btn-sm btn-outline-light">Agents</a> 
 <a href="/logout" class="btn btn-sm btn-outline-danger">Logout</a>
 </div>
 </div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
@@ -174,15 +174,66 @@ def page(c):
 def login():
     error=""
     if request.method=="POST":
-        u=request.form.get("username","")
-        p=request.form.get("password","")
+        u=request.form.get("username","").strip()
+        p=request.form.get("password","").strip()
         user=USERS.get(u)
         if user and user["pass"]==p:
             session["logged_in"]=True
             session["user"]=u
             session["role"]=user["role"]
             session["name"]=user["name"]
+            session["agent_id"]=None
+            if db_root:
+                try:
+                    db_root.child("login_logs").push({
+                        "user": u,
+                        "name": user["name"],
+                        "role": user["role"],
+                        "type": "LOGIN",
+                        "timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),
+                        "date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),
+                        "agent_id": "ADMIN"
+                    })
+                except: pass
             return f"<script>localStorage.setItem('userRole','{user['role']} - {user['name']}');window.location='/';</script>"
+        # Check agent login - username = TENCENT_ID or NAME
+        found_agent=None
+        for a in get_all():
+            tid=str(a.get("TENCENT_ID","")).strip()
+            name=str(a.get("NAME","")).lower()
+            aid=str(a.get("id"))
+            # Username can be TENCENT_ID, ID, or NAME (no space lower)
+            if u.lower()==tid.lower() or u.lower()==aid.lower() or u.lower()==name or u.lower()==name.replace(",","").replace(" ","").lower() or u.lower()==tid:
+                found_agent=a
+                break
+            # Also check if agent has custom username
+            if a.get("USERNAME","") and u.lower()==str(a.get("USERNAME")).lower():
+                found_agent=a
+                break
+        if found_agent:
+            # Password check: custom LOGIN_PASS or TENCENT_ID or default 1234
+            stored_pass=str(found_agent.get("LOGIN_PASS") or found_agent.get("TENCENT_ID") or "1234").strip()
+            if p==stored_pass or p==str(found_agent.get("TENCENT_ID")) or (stored_pass=="1234" and p=="1234"):
+                session["logged_in"]=True
+                session["user"]=found_agent.get("TENCENT_ID")
+                session["role"]="agent"
+                session["name"]=found_agent.get("NAME")
+                session["agent_id"]=found_agent.get("id")
+                if db_root:
+                    try:
+                        db_root.child("login_logs").push({
+                            "user": found_agent.get("TENCENT_ID"),
+                            "name": found_agent.get("NAME"),
+                            "role": "agent",
+                            "type": "LOGIN",
+                            "timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),
+                            "date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),
+                            "agent_id": found_agent.get("id")
+                        })
+                    except: pass
+                return f"<script>localStorage.setItem('userRole','agent - {found_agent.get('NAME')}');window.location='/view/{found_agent.get('id')}';</script>"
+            else:
+                error="Invalid agent password! Default is Tencent ID"
         else:
             error="Invalid username or password!"
     return f"""<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -196,14 +247,15 @@ def login():
     <div class="login-card text-center">
         <div class="logo">S9</div>
         <h4 style="color:white">TEAM SHINE M9</h4>
-        <small style="color:#94a3b8">Team Leader Access</small>
+        <small style="color:#94a3b8">Team Access</small>
         <form method="POST" class="mt-4 text-start">
             <label style="font-size:11px;color:#94a3b8">USERNAME</label>
             <input name="username" class="form-control mb-3" placeholder="Enter username" required>
             <label style="font-size:11px;color:#94a3b8">PASSWORD</label>
             <input name="password" type="password" class="form-control mb-3" placeholder="Enter password" required>
             <div style="color:#ef4444;font-size:12px;margin-bottom:12px">{error}</div>
-            <button class="btn btn-warning w-100" style="font-weight:700;padding:12px">Login to Dashboard</button>
+            <button class="btn btn-warning w-100" style="font-weight:700;padding:12px">Login</button>
+            <div class="mt-3 text-center"><small style="color:#64748b;font-size:11px">Agent: Use Tencent ID as username & password<br>Admin: Use your admin account</small></div>
         </form>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1e293b;text-align:center">
             <small style="color:#94a3b8">Developed By : <span style="color:#fbbf24">Moises Gamboa</span> | Computer Engineer</small>
@@ -211,8 +263,21 @@ def login():
     </div></body></html>
     """
 
+
 @app.route("/logout")
 def logout():
+    if db_root and session.get("logged_in"):
+        try:
+            db_root.child("login_logs").push({
+                "user": session.get("user",""),
+                "name": session.get("name",""),
+                "role": session.get("role",""),
+                "type": "LOGOUT",
+                "timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),
+                "date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),
+                "agent_id": session.get("agent_id","")
+            })
+        except: pass
     session.clear()
     return redirect("/login")
 
@@ -401,6 +466,9 @@ def get_filtered_stats(period, year, month, quarter, week):
 @app.route("/")
 @login_required
 def dashboard():
+    if session.get("role")=="agent" and session.get("agent_id"):
+        return redirect(f"/view/{session.get('agent_id')}")
+
     period=request.args.get("period","monthly")
     year=request.args.get("year",str(datetime.now(PH_TZ).year))
     month=request.args.get("month","")
@@ -626,6 +694,31 @@ def bulk_import():
     """
     return page(html)
 
+
+@app.route("/logs")
+@login_required
+def login_logs():
+    if session.get("role") not in ["admin"]:
+        return redirect("/")
+    logs_raw = db_root.child("login_logs").get() if db_root else {}
+    logs=[]
+    if isinstance(logs_raw, dict):
+        for lid, v in logs_raw.items():
+            if isinstance(v, dict):
+                logs.append(v)
+    logs_sorted=sorted(logs, key=lambda x: x.get("timestamp",""), reverse=True)[:100]
+    rows=""
+    for l in logs_sorted:
+        color="#22c55e" if l.get("type")=="LOGIN" else "#ef4444"
+        rows+=f"<tr><td style='color:#cbd5e1'>{l.get('timestamp','')}</td><td><b style='color:white'>{l.get('name','')}</b><br><small style='color:#94a3b8'>{l.get('user','')}</small></td><td><span class='badge' style='background:{color}'>{l.get('type')}</span></td><td>{l.get('role')}</td><td>{l.get('agent_id','')}</td></tr>"
+    if not rows:
+        rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No logs yet</td></tr>"
+    html="<div class='d-flex justify-content-between'><h5 style='color:white'>Login / Logout Logs</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div>"
+    html+=f"<div class='card-dark mt-3'><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Time</th><th>User</th><th>Type</th><th>Role</th><th>ID</th></tr></thead><tbody>{rows}</tbody></table></div></div>"
+    html+="<div class='card-dark mt-3'><h6 style='color:#94a3b8'>Info</h6><small style='color:#64748b'>Agent login: Username = Tencent ID (ex: 4909), Password = Tencent ID default<br>Agent sees only view card + graphs, no data entry<br>All login/logout tracked here</small></div>"
+    return page(html)
+
+
 @app.route("/agents")
 @login_required
 def agents_list():
@@ -719,7 +812,12 @@ def view(aid):
     </div>
     """
     html+=f"<div class='row g-2 mt-4'><div class='col-6'><div class='card-dark' style='border:1px solid #22c55e'><h6 style='color:#22c55e'>Add Normal OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='NORMAL_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#22c55e;color:white'>Add Normal OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #3b82f6'><h6 style='color:#3b82f6'>Add Restday OT</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='RESTDAY_OT'><div class='col-6'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Hours' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#3b82f6;color:white'>Add Restday OT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #f97316'><h6 style='color:#f97316'>Add AHT</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='AHT'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='Minutes' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#f97316;color:white'>Add AHT</button></div></form></div></div><div class='col-6'><div class='card-dark' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>Add QA Score</h6><form method='POST' action='/add_perf/{aid}' class='row g-2'><input type='hidden' name='type' value='QA'><div class='col-6'><input name='value' type='number' step='0.1' class='form-control form-control-sm' placeholder='%' required></div><div class='col-6'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='QA notes'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#8b5cf6;color:white'>Add QA</button></div></form></div></div><div class='col-12'><div class='card-dark' style='border:1px solid #ef4444'><h6 style='color:#ef4444'>Add Loss Hours</h6><form method='POST' action='/add_ot/{aid}' class='row g-2'><input type='hidden' name='type' value='LOSS'><div class='col-4'><input name='hours' type='number' step='0.5' class='form-control form-control-sm' placeholder='Loss Hrs' required></div><div class='col-4'><input name='date' type='date' class='form-control form-control-sm' value='{datetime.now(PH_TZ).strftime('%Y-%m-%d')}'></div><div class='col-4'><select name='loss_type' class='form-select form-select-sm'><option>Late</option><option>Absent</option><option>Undertime</option></select></div><div class='col-12'><input name='reason' class='form-control form-control-sm' placeholder='Reason'></div><div class='col-12'><button class='btn w-100 mt-1' style='background:#ef4444;color:white'>Add Loss</button></div></form></div></div></div>"
-    html+=f"<div class='mt-4'><h6 style='color:white'>OT & Loss History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>{log_rows}</tbody></table></div></div><div class='mt-3'><h6 style='color:white'>AHT & QA History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>{perf_rows}</tbody></table></div></div></div>"
+    # History for admin only
+    if not is_agent:
+            html+=f"<div class='mt-4'><h6 style='color:white'>OT & Loss History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Hrs</th><th>Reason</th><th></th></tr></thead><tbody>{log_rows}</tbody></table></div></div><div class='mt-3'><h6 style='color:white'>AHT & QA History</h6><div class='table-responsive'><table class='table table-sm'><thead><tr><th>Date</th><th>Type</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>{perf_rows}</tbody></table></div></div>"
+    else:
+        html+=f"<div class='card-dark mt-3' style='border:1px solid #334155'><h6 style='color:#94a3b8'>View Only - Agent Mode</h6><small style='color:#64748b'>You can view your performance cards and graphs only. Data entry is restricted to Team Leader.</small></div>"
+    html+="</div>"
     return page(html)
 
 @app.route("/set_target/<aid>", methods=["POST"])
