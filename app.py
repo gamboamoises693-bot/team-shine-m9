@@ -1565,6 +1565,11 @@ def export_pdf():
 import coaching
 # --- end Coaching Minutes integration ---
 
+# --- Executive PDF report integration (added) ---
+# Loads pdf_export.py, which swaps in a fixed, more executive /export/pdf.
+import pdf_export
+# --- end Executive PDF report integration ---
+
 
 
 
