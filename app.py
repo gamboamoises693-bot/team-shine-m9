@@ -286,7 +286,7 @@ def get_navbar():
     if is_agent:
         return f"""
 <nav class="navbar p-3"><div class="container-fluid">
-<a class="navbar-brand fw-bold" href="/view/{agent_id}" style="color:var(--text)">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">AGENT</small></a>
+<a class="navbar-brand fw-bold" href="/view/{agent_id}" style="color:var(--text)">TEAM SHINE PORTAL<small style="color:#fbbf24;font-size:11px">AGENT</small></a>
 <div class="d-flex gap-2 align-items-center">
 <button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()">🌓</button>
 <div class="dropdown">
@@ -540,7 +540,7 @@ def dashboard():
       <div class="col-12 col-md-6"><div class="chart-card" style="border:1px solid #ef4444"><h6 style="color:#ef4444">Loss Hrs</h6><canvas id="chartLoss"></canvas></div></div>
     </div>
     <div class="row g-3 mt-3">
-      <div class="col-12"><h6 style="color:#fbbf24;margin:8px 0">📈 TL Team KPI Graphs - QA, AHT, ATTENDANCE (Main UI for TL)</h6></div>
+      <div class="col-12"><h6 style="color:#fbbf24;margin:8px 0">📈 TL Team KPI Graphs - QA, AHT, ATTENDANCE</h6></div>
       <div class="col-12 col-md-4"><div class="chart-card" style="border:1px solid #8b5cf6"><h6 style="color:#8b5cf6">Team QA Trend - {period}</h6><canvas id="chartQA"></canvas></div></div>
       <div class="col-12 col-md-4"><div class="chart-card" style="border:1px solid #f97316"><h6 style="color:#f97316">Team AHT Trend - {period}</h6><canvas id="chartAHT"></canvas></div></div>
       <div class="col-12 col-md-4"><div class="chart-card" style="border:1px solid #22c55e"><h6 style="color:#22c55e">Team Attendance Trend - {period}</h6><canvas id="chartAttendance"></canvas></div></div>
