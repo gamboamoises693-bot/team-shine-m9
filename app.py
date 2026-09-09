@@ -1084,6 +1084,12 @@ def view(aid):
       """
     else:
         html+=f"<div class='card-dark mt-3'><h6 style='color:#94a3b8'>View Only - Agent Mode</h6><small style='color:#64748b'>CSAT {lc}% | FCR {lf}% | Risk {risk}</small></div>"
+
+    # --- Coaching Minutes integration (added) ---
+    import coaching
+    html += coaching.render_coaching_section(aid, is_agent)
+    # --- end Coaching Minutes integration ---
+
     html+="</div>"
     return page(html)
 
@@ -1553,6 +1559,11 @@ def export_pdf():
     except Exception as e:
         traceback.print_exc()
         return page(f"<div class='card-dark'><h6>PDF Error</h6><pre>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+
+# --- Coaching Minutes integration (added) ---
+# Loads coaching.py so its @app.route(...) decorators register on this app.
+import coaching
+# --- end Coaching Minutes integration ---
 
 
 
