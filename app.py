@@ -114,12 +114,6 @@ def get_all_announcements():
                 if isinstance(val, dict):
                     val["id"]=aid
                     res.append(val)
-        elif isinstance(raw, list):
-            for idx, val in enumerate(raw):
-                if isinstance(val, dict) and val:
-                    val["id"]=str(val.get("id") or idx)
-                    res.append(val)
-        # Sort by date desc
         res.sort(key=lambda x: x.get("created_at",""), reverse=True)
         return res
     except:
@@ -269,50 +263,21 @@ BASE_HEAD = """<!doctype html><html><head><meta name="viewport" content="width=d
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-:root{--bg:#0b1120;--card:#151e32;--card2:#0f172a;--border:#2d3748;--border2:#1e293b;--text:#f1f5f9;--text2:#94a3b8;--yellow:#fbbf24}
+:root{--bg:#0b1120;--card:#151e32;--card2:#0f172a;--border:#2d3748;--border2:#1e293b;--text:#f1f5f9;--text2:#94a3b8}
 [data-theme="light"]{--bg:#f1f5f9;--card:#ffffff;--card2:#e2e8f0;--border:#cbd5e1;--border2:#e2e8f0;--text:#0f172a;--text2:#475569}
-body{background:var(--bg);color:var(--text);font-family:Inter,system-ui;transition:background 0.3s,color 0.3s}
-.card-dark{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;transition:all 0.3s}
-.kpi{padding:12px 8px;border-radius:16px;background:var(--card);border:1px solid var(--border);text-align:center;min-height:110px;height:110px;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:all 0.3s}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui}
+.card-dark{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px}
+.kpi{padding:12px 8px;border-radius:16px;background:var(--card);border:1px solid var(--border);text-align:center;min-height:110px;height:110px;display:flex;flex-direction:column;justify-content:center;align-items:center}
 .label{font-size:9px;color:var(--text2);text-transform:uppercase;font-weight:600;min-height:22px;display:flex;align-items:center;justify-content:center}
 .val-big{font-size:22px;font-weight:800;margin-top:2px}
-.chart-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;transition:all 0.3s}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px}
 .table thead th{background:var(--card2)!important;color:#fbbf24!important;font-size:10px;text-transform:uppercase;border:none!important}
 .table tbody td{background:var(--card)!important;border-color:var(--border2)!important;color:var(--text)!important;padding:12px 8px}
 input,select{background:var(--card2)!important;color:var(--text)!important;border:1px solid var(--border)!important}
-.navbar{background:var(--card2)!important;border-bottom:1px solid var(--border2)!important;transition:all 0.3s}
+.navbar{background:var(--card2)!important;border-bottom:1px solid var(--border2)!important}
 </style></head><body>
-<nav class="navbar p-3"><div class="container-fluid">
-<a class="navbar-brand fw-bold" href="/" style="color:var(--text)">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">TEAM LEADER - TL KPI QA/AHT/ATTENDANCE</small></a>
-<div class="d-flex gap-2 align-items-center">
-<button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()" title="Light/Dark Mode">🌓</button>
-<div class="dropdown">
-  <button class="btn btn-sm btn-warning dropdown-toggle" type="button" id="mainMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size:18px;font-weight:900">
-    ☰
-  </button>
-  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mainMenuDropdown" style="background:var(--card);border:1px solid var(--border);min-width:220px">
-    <li><h6 class="dropdown-header" style="color:#fbbf24">📋 Main Menu - Three Lines Dropdown</h6></li>
-    <li><a class="dropdown-item" href="/" style="color:var(--text)">🏠 Dashboard - Main UI</a></li>
-    <li><a class="dropdown-item" href="/agents" style="color:var(--text)">👥 Agents - Add/Edit/Delete</a></li>
-    <li><a class="dropdown-item" href="/logs" style="color:var(--text)">📋 Logs - All Activities</a></li>
-    <li><a class="dropdown-item" href="/working_hours" style="color:var(--text)">⏱️ Working Hours - 220h</a></li>
-    <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
-    <li><h6 class="dropdown-header" style="color:#22c55e">📊 Export & Reports</h6></li>
-    <li><a class="dropdown-item" href="/announcements" style="color:var(--text)">📢 Announcements - TL Post + Agent Confirm</a></li>
-    <li><a class="dropdown-item" href="/export" style="color:var(--text)">📊 Export Excel - QA AHT Attendance</a></li>
-    <li><a class="dropdown-item" href="/export/csv" style="color:var(--text)">📥 Export CSV</a></li>
-    <li><a class="dropdown-item" href="/export/excel" style="color:var(--text)">📊 Download Excel</a></li>
-    <li><a class="dropdown-item" href="/export/pdf" style="color:var(--text)">📄 Executive Report PDF + Graphs</a></li>
-    <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
-    <li><h6 class="dropdown-header" style="color:#8b5cf6">⚙️ Settings</h6></li>
-    <li><a class="dropdown-item" href="/change_password" style="color:var(--text)">🔑 Change Password</a></li>
-    <li><a class="dropdown-item" href="/health" style="color:var(--text)">✅ Health Check - OK</a></li>
-    <li><hr class="dropdown-divider" style="border-color:var(--border)"></li>
-    <li><a class="dropdown-item" href="/logout" style="color:#ef4444">🚪 Logout</a></li>
-  </ul>
-</div>
-</div>
-</div></nav><div class="container-fluid p-3" style="max-width:1200px;margin:auto">
+NAVBAR_PLACEHOLDER
+<div class="container-fluid p-3" style="max-width:1200px;margin:auto">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function toggleTheme(){
@@ -327,13 +292,72 @@ function toggleTheme(){
 (function(){
   const saved=localStorage.getItem('theme')||'dark';
   document.documentElement.setAttribute('data-theme',saved);
-  const btn=document.getElementById('themeToggle');
-  if(btn) btn.textContent=saved==='dark'?'🌓':'☀️';
 })();
 </script>
 """
-
 BASE_FOOT = "</div><footer style='text-align:center;padding:24px;color:#64748b;font-size:12px;border-top:1px solid #1e293b;margin-top:30px'><div>Developed By : <span style='color:#fbbf24;font-weight:700'>Moises Gamboa</span> | Computer Engineer</div></footer></body></html>"
+
+def get_navbar():
+    role=session.get("role","")
+    is_agent=role=="agent"
+    agent_id=session.get("agent_id","")
+    if is_agent:
+        return f"""
+<nav class="navbar p-3"><div class="container-fluid">
+<a class="navbar-brand fw-bold" href="/view/{agent_id}" style="color:var(--text)">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">AGENT</small></a>
+<div class="d-flex gap-2 align-items-center">
+<button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()">🌓</button>
+<div class="dropdown">
+  <button class="btn btn-sm btn-warning dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-weight:900">☰</button>
+  <ul class="dropdown-menu dropdown-menu-end" style="background:var(--card);border:1px solid var(--border);min-width:200px">
+    <li><h6 class="dropdown-header" style="color:#fbbf24">Agent Menu</h6></li>
+    <li><a class="dropdown-item" href="/view/{agent_id}" style="color:var(--text)">🏠 My Dashboard</a></li>
+    <li><a class="dropdown-item" href="/announcements" style="color:var(--text)">📢 Announcements</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="/change_password" style="color:var(--text)">🔑 Change Password</a></li>
+    <li><a class="dropdown-item" href="/health" style="color:var(--text)">✅ Health Check</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="/logout" style="color:#ef4444">🚪 Logout</a></li>
+  </ul>
+</div>
+</div>
+</div></nav>
+"""
+    else:
+        return """
+<nav class="navbar p-3"><div class="container-fluid">
+<a class="navbar-brand fw-bold" href="/" style="color:var(--text)">TEAM SHINE M9 <small style="color:#fbbf24;font-size:11px">TEAM LEADER</small></a>
+<div class="d-flex gap-2 align-items-center">
+<button id="themeToggle" class="btn btn-sm btn-outline-warning" onclick="toggleTheme()">🌓</button>
+<div class="dropdown">
+  <button class="btn btn-sm btn-warning dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-weight:900">☰</button>
+  <ul class="dropdown-menu dropdown-menu-end" style="background:var(--card);border:1px solid var(--border);min-width:220px">
+    <li><h6 class="dropdown-header" style="color:#fbbf24">Main Menu</h6></li>
+    <li><a class="dropdown-item" href="/" style="color:var(--text)">🏠 Dashboard</a></li>
+    <li><a class="dropdown-item" href="/agents" style="color:var(--text)">👥 Agents</a></li>
+    <li><a class="dropdown-item" href="/logs" style="color:var(--text)">📋 Logs</a></li>
+    <li><a class="dropdown-item" href="/working_hours" style="color:var(--text)">⏱️ Working Hours</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" style="color:#22c55e">Export & Reports</h6></li>
+    <li><a class="dropdown-item" href="/announcements" style="color:var(--text)">📢 Announcements</a></li>
+    <li><a class="dropdown-item" href="/export" style="color:var(--text)">📊 Export</a></li>
+    <li><a class="dropdown-item" href="/export/pdf" style="color:var(--text)">📄 PDF Report</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="/change_password" style="color:var(--text)">🔑 Change Password</a></li>
+    <li><a class="dropdown-item" href="/health" style="color:var(--text)">✅ Health Check</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="/logout" style="color:#ef4444">🚪 Logout</a></li>
+  </ul>
+</div>
+</div>
+</div></nav>
+"""
+
+def page(c):
+    navbar=get_navbar()
+    head=BASE_HEAD.replace("NAVBAR_PLACEHOLDER", navbar)
+    return head + c + BASE_FOOT
+
 
 def page(c):
     return BASE_HEAD + c + BASE_FOOT
@@ -558,8 +582,7 @@ def dashboard():
         wh_pct = min(100, a['wh_comp'])
         wh_color = "#22c55e" if wh_pct>=95 else "#fbbf24" if wh_pct>=90 else "#ef4444"
         st = "<span class='badge bg-danger'>Critical</span>" if a['loss']>=4 else "<span class='badge bg-success'>Good</span>"
-        av=a.get('avatar',''); av_html=f"<img src='{av}' style='width:28px;height:28px;border-radius:6px;object-fit:cover;margin-right:6px;border:1px solid #fbbf24'>" if av else f"<div style='width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#111827;margin-right:6px'>{str(a['name'])[:1]}</div>"
-        html+=f"<tr><td><a href='/view/{a['id']}' style='color:white;text-decoration:none;display:flex;align-items:center'>{av_html}<div><b>{a['name']}</b><br><small style='color:#94a3b8'>{a['tid']}</small></div></a></td><td style='color:#fbbf24'>{a['tot']}h</td><td>{a['target']}h</td><td><div class='progress' style='height:10px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{pct}%;background:{bar_color}'></div></div><small style='font-size:10px'>{round(a['pct'],0)}%</small></td><td><div class='progress' style='height:8px;width:80px;background:#0f172a'><div class='progress-bar' style='width:{wh_pct}%;background:{wh_color}'></div></div><small>{round(wh_pct,1)}%</small></td><td style='color:#ef4444'>{a['loss']}h</td><td>{a['qa']}% / {a['csat']}%</td><td>{st}</td></tr>"
+        html+=f"<tr><td><a href='/view/{a['id']}' style='color:white;text-decoration:none'><b>{a['name']}</b><br><small style='color:#94a3b8'>{a['tid']}</small></a></td><td style='color:#fbbf24'>{a['tot']}h</td><td>{a['target']}h</td><td><div class='progress' style='height:10px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{pct}%;background:{bar_color}'></div></div><small style='font-size:10px'>{round(a['pct'],0)}%</small></td><td><div class='progress' style='height:8px;width:80px;background:#0f172a'><div class='progress-bar' style='width:{wh_pct}%;background:{wh_color}'></div></div><small>{round(wh_pct,1)}%</small></td><td style='color:#ef4444'>{a['loss']}h</td><td>{a['qa']}% / {a['csat']}%</td><td>{st}</td></tr>"
     html+="</tbody></table></div></div><script>document.addEventListener('DOMContentLoaded',function(){var i=document.getElementById('teamSearch');if(!i)return;i.addEventListener('keyup',function(){var q=this.value.toLowerCase();document.querySelectorAll('#teamTable tbody tr').forEach(function(r){r.style.display=r.innerText.toLowerCase().includes(q)?'':'none';});});});</script>"
     return page(html)
 
@@ -577,9 +600,7 @@ def agents_list():
         logs=get_ot(a.get("id"))
         n,r,tot,loss,net=calc(logs)
         t_id=a.get("TENCENT ID") or a.get("TENCENT_ID","")
-        av=a.get('AVATAR') or a.get('AVATAR_URL') or ''
-        av_html=f"<img src='{av}' style='width:32px;height:32px;border-radius:8px;object-fit:cover;margin-right:8px;border:1px solid #fbbf24'>" if av else f"<div style='width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#111827;margin-right:8px'>{str(a.get('NAME','?'))[:1]}</div>"
-        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:var(--text);text-decoration:none;display:flex;align-items:center'>{av_html}<div><b>{a.get('NAME','')}</b><br><small style='color:var(--text2)'>{t_id} | {a.get('EMAIL','')}</small></div></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/agents?edit={a.get('id')}&q={q}' class='btn btn-sm btn-primary'>Edit</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent {a.get('NAME','')}?')\">X</a></td></tr>"
+        rows+=f"<tr><td>{a.get('id')}</td><td><a href='/view/{a.get('id')}' style='color:var(--text);text-decoration:none'><b>{a.get('NAME','')}</b><br><small style='color:var(--text2)'>{t_id} | {a.get('EMAIL','')}</small></a></td><td>{tot}h</td><td style='color:#ef4444'>{loss}h</td><td><a href='/view/{a.get('id')}' class='btn btn-sm btn-warning'>View</a> <a href='/agents?edit={a.get('id')}&q={q}' class='btn btn-sm btn-primary'>Edit</a> <a href='/delete_agent/{a.get('id')}' class='btn btn-sm btn-outline-danger' onclick=\"return confirm('Delete agent {a.get('NAME','')}?')\">X</a></td></tr>"
     if not rows:
         rows="<tr><td colspan=5 style='text-align:center;color:var(--text2)'>No agents</td></tr>"
     # Edit form if edit_id
@@ -762,6 +783,127 @@ def delete_agent(aid):
         pass
     return redirect("/agents")
 
+
+@app.route("/announcements")
+@login_required
+def announcements_page():
+    anns=get_all_announcements()
+    agents=get_all()
+    reads=get_announcement_reads()
+    role=session.get("role","")
+    is_agent=role=="agent"
+    if is_agent:
+        agent_id=session.get("agent_id")
+        html_cards=""
+        for ann in anns:
+            read=has_read(ann.get("id"), agent_id)
+            reads_count=len(get_reads_for_announcement(ann.get("id")))
+            important_badge="<span class='badge bg-danger'>IMPORTANT</span>" if str(ann.get("important"))=="true" else ""
+            status_html="<span class='badge bg-success'>✅ Nabasa</span>" if read else f"<a href='/confirm_announcement/{ann.get('id')}' class='btn btn-sm btn-success'>✅ Confirm Nabasa</a>"
+            html_cards+=f"<div class='card-dark mt-2' style='border:2px solid #fbbf24'><div class='d-flex justify-content-between'><b>{ann.get('title','')} {important_badge}</b><small>{ann.get('created_at','')}</small></div><p style='margin:8px 0'>{ann.get('message','')}</p><div class='d-flex justify-content-between'><small>By: {ann.get('created_by','')} | {reads_count} confirmed</small>{status_html}</div></div>"
+        if not html_cards:
+            html_cards="<div class='card-dark mt-3'><p style='text-align:center;color:var(--text2)'>No announcements</p></div>"
+        return page(f"<h5>📢 Announcements</h5>{html_cards}<div class='mt-3'><a href='/view/{agent_id}' class='btn btn-sm btn-outline-light'>Back</a></div>")
+    rows=""
+    for ann in anns:
+        ann_reads=get_reads_for_announcement(ann.get("id"))
+        read_list=""
+        for r in ann_reads:
+            read_list+=f"<span class='badge bg-success' style='margin:2px'>{r.get('agent_name','')} ✅</span> "
+        if not read_list:
+            read_list="<small style='color:var(--text2)'>0 reads</small>"
+        important_badge="<span class='badge bg-danger'>IMPORTANT</span>" if str(ann.get("important"))=="true" else ""
+        rows+=f"<div class='card-dark mt-2'><div class='d-flex justify-content-between'><b>{ann.get('title','')} {important_badge}</b><div><small>{ann.get('created_at','')}</small> <a href='/delete_announcement/{ann.get('id')}' class='btn btn-sm btn-outline-danger'>X</a></div></div><p style='font-size:13px'>{ann.get('message','')}</p><small>{len(ann_reads)}/{len(agents)} confirmed</small><div class='mt-2'>{read_list}</div></div>"
+    if not rows:
+        rows="<div class='card-dark mt-3'><p style='text-align:center;color:var(--text2)'>No announcements</p></div>"
+    return page(f"<h5>📢 Announcements Management</h5><div class='card-dark mt-3' style='border:2px solid #fbbf24'><h6>➕ Post Announcement</h6><form method='POST' action='/add_announcement' class='row g-2 mt-2'><div class='col-12 col-md-8'><input name='title' class='form-control form-control-sm' placeholder='Title' required></div><div class='col-12 col-md-4'><select name='important' class='form-select form-select-sm'><option value='false'>Normal</option><option value='true'>Important</option></select></div><div class='col-12'><textarea name='message' class='form-control form-control-sm' rows='3' placeholder='Message' required></textarea></div><div class='col-12'><button class='btn btn-warning w-100'>📢 Post Announcement</button></div></form></div><div class='mt-4'><h6>All Announcements ({len(anns)})</h6>{rows}</div><div class='mt-3'><a href='/' class='btn btn-sm btn-outline-light'>Back</a></div>")
+
+@app.route("/add_announcement", methods=["POST"])
+@login_required
+def add_announcement():
+    if session.get("role")=="agent":
+        return redirect("/announcements")
+    try:
+        title=request.form.get("title","").strip()
+        message=request.form.get("message","").strip()
+        important=request.form.get("important","false")
+        if not title or not message:
+            return redirect("/announcements")
+        if db_root:
+            import uuid
+            ann_id=str(uuid.uuid4())[:8]
+            db_root.child(f"announcements/{ann_id}").set({"id": ann_id, "title": title, "message": message, "important": important, "created_by": session.get("name","TL"), "created_at": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p"), "date": datetime.now(PH_TZ).strftime("%Y-%m-%d")})
+    except:
+        pass
+    return redirect("/announcements")
+
+@app.route("/delete_announcement/<ann_id>")
+@login_required
+def delete_announcement(ann_id):
+    if session.get("role")=="agent":
+        return redirect("/announcements")
+    try:
+        if db_root:
+            db_root.child(f"announcements/{ann_id}").delete()
+            reads=get_announcement_reads()
+            for r in reads:
+                if str(r.get("announcement_id"))==str(ann_id):
+                    db_root.child(f"announcement_reads/{r.get('id')}").delete()
+    except:
+        pass
+    return redirect("/announcements")
+
+@app.route("/confirm_announcement/<ann_id>")
+@login_required
+def confirm_announcement(ann_id):
+    try:
+        agent_id=session.get("agent_id") or session.get("user")
+        agent_name=session.get("name") or session.get("user")
+        if not agent_id or has_read(ann_id, agent_id):
+            return redirect("/announcements")
+        if db_root:
+            import uuid
+            read_id=str(uuid.uuid4())[:8]
+            db_root.child(f"announcement_reads/{read_id}").set({"id": read_id, "announcement_id": ann_id, "agent_id": agent_id, "agent_name": agent_name, "read_at": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p"), "date": datetime.now(PH_TZ).strftime("%Y-%m-%d")})
+    except:
+        pass
+    return redirect("/announcements")
+
+@app.route("/upload_avatar/<aid>", methods=["POST"])
+@login_required
+def upload_avatar(aid):
+    try:
+        if 'avatar' not in request.files:
+            return redirect(f"/view/{aid}")
+        file=request.files['avatar']
+        if file.filename=='':
+            return redirect(f"/view/{aid}")
+        if not file.content_type.startswith('image/'):
+            return redirect(f"/view/{aid}")
+        import base64
+        data=file.read()
+        if len(data)>200*1024:
+            return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Image too large max 200KB</h6><a href='/view/{aid}' class='btn btn-sm btn-outline-light'>Back</a></div>")
+        b64=base64.b64encode(data).decode('utf-8')
+        data_url=f"data:{file.content_type};base64,{b64}"
+        if db_root:
+            db_root.child(f"agents/{aid}/AVATAR").set(data_url)
+    except:
+        pass
+    return redirect(f"/view/{aid}")
+
+@app.route("/delete_avatar/<aid>")
+@login_required
+def delete_avatar(aid):
+    try:
+        if db_root:
+            db_root.child(f"agents/{aid}/AVATAR").delete()
+    except:
+        pass
+    return redirect(f"/view/{aid}")
+
+
+
 @app.route("/view/<aid>")
 @login_required
 def view(aid):
@@ -812,7 +954,9 @@ def view(aid):
     if not perf_rows:
         perf_rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No logs</td></tr>"
     initial=str(data.get("NAME","?"))[:1]
-    avatar_url=data.get("AVATAR") or data.get("AVATAR_URL") or data.get("AVATAR IMAGE") or "" 
+    avatar_url=data.get("AVATAR") or data.get("AVATAR_URL") or ""
+    avatar_html=f"<div style='width:90px;height:90px;border-radius:18px;overflow:hidden;margin:auto;border:2px solid #fbbf24'><img src='{avatar_url}' style='width:100%;height:100%;object-fit:cover'></div>" if avatar_url else f"<div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div>"
+    delete_link=f'<a href="/delete_avatar/{aid}" class="btn btn-sm btn-outline-danger">Remove</a>' if avatar_url else ""
     target=float(data.get("TARGET_OT",20))
     wh_target=float(data.get("WORKING_HOURS_TARGET",220))
     pct=(tot/target*100) if target>0 else 0
@@ -827,17 +971,23 @@ def view(aid):
     if la>10: risk_score+=20
     risk="Critical" if risk_score>=60 else "High" if risk_score>=40 else "Moderate" if risk_score>=20 else "Low"
     risk_color="#22c55e" if risk=="Low" else "#fbbf24" if risk=="Moderate" else "#f97316" if risk=="High" else "#ef4444"
-    avatar_html=f"<div style='width:90px;height:90px;border-radius:18px;overflow:hidden;margin:auto;border:2px solid #fbbf24'><img src='{avatar_url}' style='width:100%;height:100%;object-fit:cover'></div>" if avatar_url else f"<div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div>"
-    delete_link=f'<a href="/delete_avatar/{aid}" class="btn btn-sm btn-outline-danger" onclick="return confirm(\'Delete avatar?\')">🗑️ Remove</a>' if avatar_url else ''
-    html=f"""<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'>{avatar_html}<h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small>
-      <div class='mt-2'>
-        <form method='POST' action='/upload_avatar/{aid}' enctype='multipart/form-data' class='d-flex gap-2 justify-content-center align-items-center flex-wrap'>
-          <input type='file' name='avatar' accept='image/*' class='form-control form-control-sm' style='width:200px' required>
-          <button class='btn btn-sm btn-warning'>📸 Upload Avatar</button>
-          {delete_link}
-        </form>
-        <small style='color:var(--text2);font-size:10px'>Upload image para avatar nila - JPG/PNG max 200KB - mas maganda tignan!</small>
-      </div><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"""
+    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'>{avatar_html}<h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small><div class='mt-2'><form method='POST' action='/upload_avatar/{aid}' enctype='multipart/form-data' class='d-flex gap-2 justify-content-center'><input type='file' name='avatar' accept='image/*' class='form-control form-control-sm' style='width:180px' required><button class='btn btn-sm btn-warning'>📸 Upload</button>{delete_link}</form></div><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"
+
+    anns=get_all_announcements()
+    agent_reads=[]
+    for ann in anns:
+        if not has_read(ann.get("id"), aid):
+            agent_reads.append(ann)
+    ann_html_agent=""
+    for ann in anns[:3]:
+        read=has_read(ann.get("id"), aid)
+        status_btn="<span class='badge bg-success'>✅ Nabasa</span>" if read else f"<a href='/confirm_announcement/{ann.get('id')}' class='btn btn-sm btn-success'>✅ Confirm</a>"
+        ann_html_agent+=f"<div class='card-dark mt-2' style='border:1px solid #fbbf24'><b style='font-size:12px'>{ann.get('title','')}</b><p style='font-size:12px;margin:4px 0'>{ann.get('message','')}</p><div class='d-flex justify-content-between'><small>By: {ann.get('created_by','TL')}</small>{status_btn}</div></div>"
+    if agent_reads:
+        html+=f"<div class='card-dark mt-3' style='border:2px solid #ef4444'><h6 style='color:#ef4444'>📢 New Announcements ({len(agent_reads)} unread)</h6>{ann_html_agent}<a href='/announcements' class='btn btn-sm btn-warning w-100 mt-2'>View All + Confirm</a></div>"
+    else:
+        html+=f"<div class='card-dark mt-3' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>📢 Announcements</h6>{ann_html_agent if ann_html_agent else '<small>No announcements</small>'}<a href='/announcements' class='btn btn-sm btn-outline-light w-100 mt-2'>View All</a></div>"
+
     html+=f"<div class='row g-2 mt-3'><div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL</div><div class='val-big' style='color:#22c55e'>{n}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY</div><div class='val-big' style='color:#3b82f6'>{r}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS</div><div class='val-big' style='color:#ef4444'>{loss}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>{tot}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET</div><div class='val-big' style='color:#fbbf24'>+{net}h</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f97316;min-height:80px;height:80px'><div class='label'>AHT</div><div class='val-big' style='font-size:16px;color:#f97316'>{la}m</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #8b5cf6;min-height:80px;height:80px'><div class='label'>QA</div><div class='val-big' style='font-size:16px;color:#8b5cf6'>{lq}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #06b6d4;min-height:80px;height:80px'><div class='label'>CSAT</div><div class='val-big' style='font-size:16px;color:#06b6d4'>{lc}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f59e0b;min-height:80px;height:80px'><div class='label'>FCR</div><div class='val-big' style='font-size:16px;color:#f59e0b'>{lf}%</div></div></div></div>"
 
     # ViewCard AHT QA - Enhanced
@@ -1184,204 +1334,6 @@ def working_hours():
     html=f"<div class='d-flex justify-content-between'><h5 style='color:white'>Working Hours - 220h Target (10h x 22 days)</h5><a href='/' class='btn btn-sm btn-outline-light'>Dashboard</a></div><div class='card-dark mt-3'><div class='table-responsive'><table class='table table-sm'><thead><tr><th>AGENT</th><th>TARGET</th><th>LOSS</th><th>ACTUAL</th><th>COMPLIANCE</th><th>OT</th><th>STATUS</th></tr></thead><tbody>{rows}</tbody></table></div></div>"
     return page(html)
 
-
-@app.route("/upload_avatar/<aid>", methods=["POST"])
-@login_required
-def upload_avatar(aid):
-    try:
-        if 'avatar' not in request.files:
-            return redirect(f"/view/{aid}")
-        file=request.files['avatar']
-        if file.filename=='':
-            return redirect(f"/view/{aid}")
-        # Check file type
-        if not file.content_type.startswith('image/'):
-            return redirect(f"/view/{aid}")
-        # Read and encode as base64 for storage in Firebase (simple solution)
-        import base64
-        data=file.read()
-        # Limit size to 200KB to avoid Firebase limits
-        if len(data)>200*1024:
-            # Resize? For now just reject
-            return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Image too large - max 200KB</h6><a href='/view/{aid}' class='btn btn-sm btn-outline-light'>Back</a></div>")
-        b64=base64.b64encode(data).decode('utf-8')
-        mime=file.content_type
-        data_url=f"data:{mime};base64,{b64}"
-        if db_root:
-            db_root.child(f"agents/{aid}/AVATAR").set(data_url)
-            # Also store as AVATAR_URL for compatibility
-            db_root.child(f"agents/{aid}/AVATAR_URL").set(data_url)
-            try:
-                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": session.get("role"),"type": f"UPLOAD_AVATAR {aid}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": aid})
-            except:
-                pass
-    except Exception as e:
-        print(f"upload_avatar error: {e}")
-        traceback.print_exc()
-    return redirect(f"/view/{aid}")
-
-@app.route("/delete_avatar/<aid>")
-@login_required
-def delete_avatar(aid):
-    try:
-        if db_root:
-            db_root.child(f"agents/{aid}/AVATAR").delete()
-            db_root.child(f"agents/{aid}/AVATAR_URL").delete()
-    except:
-        pass
-    return redirect(f"/view/{aid}")
-
-
-
-@app.route("/announcements")
-@login_required
-def announcements_page():
-    if session.get("role")=="agent":
-        # Agent sees announcements
-        anns=get_all_announcements()
-        agent_id=session.get("agent_id")
-        html_cards=""
-        for ann in anns:
-            read=has_read(ann.get("id"), agent_id)
-            reads=get_reads_for_announcement(ann.get("id"))
-            read_status=f"<span class='badge bg-success'>✅ Nabasa mo na - {ann.get('read_count', len(reads))} reads</span>" if read else f"<span class='badge bg-warning'>⚠️ Hindi pa nabasa</span> <a href='/confirm_announcement/{ann.get('id')}' class='btn btn-sm btn-success'>✅ Confirm na Nabasa Ko</a>"
-            important_badge="<span class='badge bg-danger'>🔴 IMPORTANT</span>" if ann.get("important")=="true" or ann.get("important")==True else ""
-            html_cards+=f"""
-            <div class='card-dark mt-2' style='border:2px solid {"#ef4444" if important_badge else "#fbbf24"}'>
-              <div class='d-flex justify-content-between'><h6 style='color:var(--text)'>{ann.get('title','No Title')} {important_badge}</h6><small style='color:var(--text2)'>{ann.get('created_at','')}</small></div>
-              <p style='color:var(--text);margin:8px 0'>{ann.get('message','')}</p>
-              <div class='d-flex justify-content-between align-items-center'><small style='color:var(--text2)'>By: {ann.get('created_by','TL')} | {len(reads)} agents confirmed</small>{read_status}</div>
-            </div>
-            """
-        if not html_cards:
-            html_cards="<div class='card-dark mt-3'><p style='color:var(--text2);text-align:center'>No announcements - Wala pang announcement si TL</p></div>"
-        return page(f"<h5 style='color:var(--text)'>📢 Announcements - Important Reminders para sa Agent</h5>{html_cards}<div class='mt-3'><a href='/view/{agent_id}' class='btn btn-sm btn-outline-light'>Back to My Dashboard</a></div>")
-    # TL view - manage announcements
-    anns=get_all_announcements()
-    agents=get_all()
-    reads=get_announcement_reads()
-    rows=""
-    for ann in anns:
-        ann_reads=get_reads_for_announcement(ann.get("id"))
-        read_list=""
-        for r in ann_reads:
-            # Find agent name
-            aname=r.get("agent_name","")
-            if not aname:
-                for a in agents:
-                    if str(a.get("id"))==str(r.get("agent_id")):
-                        aname=a.get("NAME","")
-                        break
-            read_list+=f"<span class='badge bg-success' style='margin:2px'>{aname} ✅ {r.get('read_at','')[:10]}</span> "
-        if not read_list:
-            read_list="<small style='color:var(--text2)'>Wala pang nag confirm - 0 reads</small>"
-        important_badge="<span class='badge bg-danger'>IMPORTANT</span>" if ann.get("important")=="true" or ann.get("important")==True else ""
-        rows+=f"""
-        <div class='card-dark mt-2' style='border:1px solid #334155'>
-          <div class='d-flex justify-content-between'><h6 style='color:var(--text)'>{ann.get('title','')} {important_badge}</h6><div><small style='color:var(--text2)'>{ann.get('created_at','')}</small> <a href='/delete_announcement/{ann.get('id')}' class='btn btn-sm btn-outline-danger' onclick="return confirm('Delete announcement?')">X</a></div></div>
-          <p style='color:var(--text2);font-size:13px'>{ann.get('message','')}</p>
-          <div><small style='color:var(--text2)'>By: {ann.get('created_by','')} | {len(ann_reads)}/{len(agents)} confirmed reads</small></div>
-          <div class='mt-2'>{read_list}</div>
-        </div>
-        """
-    if not rows:
-        rows="<div class='card-dark mt-3'><p style='color:var(--text2);text-align:center'>No announcements yet - Mag post ka ng important reminder para sa agents!</p></div>"
-    return page(f"""
-    <h5 style='color:var(--text)'>📢 Announcements Management - TL magpopost, Agent kita + Confirm</h5>
-    <div class='card-dark mt-3' style='border:2px solid #fbbf24'>
-      <h6 style='color:#fbbf24'>➕ Mag Post ng Announcement - Important Reminder para sa Agents</h6>
-      <form method='POST' action='/add_announcement' class='row g-2 mt-2'>
-        <div class='col-12 col-md-8'><label class='label'>Title *</label><input name='title' class='form-control form-control-sm' placeholder='Ex: Important Meeting Bukas 9AM, New QA Guidelines, etc.' required></div>
-        <div class='col-12 col-md-4'><label class='label'>Important?</label><select name='important' class='form-select form-select-sm'><option value='false'>Normal</option><option value='true'>🔴 Important - Red Border</option></select></div>
-        <div class='col-12'><label class='label'>Message * - Important Reminder</label><textarea name='message' class='form-control form-control-sm' rows='3' placeholder='Ex: Lahat ng agents need umattend ng meeting bukas 9AM sa conference room. Bring your QA reports. Important! - TL' required></textarea></div>
-        <div class='col-12'><button class='btn btn-warning w-100'>📢 Post Announcement - Kita sa UI ng mga Agent + May Confirm</button></div>
-      </form>
-    </div>
-    <div class='mt-4'><h6 style='color:var(--text)'>All Announcements ({len(anns)}) - May Confirm para alam ni TL na nabasa</h6>{rows}</div>
-    <div class='mt-3'><a href='/' class='btn btn-sm btn-outline-light'>Back to Dashboard</a></div>
-    """)
-
-@app.route("/add_announcement", methods=["POST"])
-@login_required
-def add_announcement():
-    if session.get("role")=="agent":
-        return redirect("/announcements")
-    try:
-        title=request.form.get("title","").strip()
-        message=request.form.get("message","").strip()
-        important=request.form.get("important","false")
-        if not title or not message:
-            return redirect("/announcements")
-        if db_root:
-            import uuid
-            ann_id=str(uuid.uuid4())[:8]
-            db_root.child(f"announcements/{ann_id}").set({
-                "id": ann_id,
-                "title": title,
-                "message": message,
-                "important": important,
-                "created_by": session.get("name","TL"),
-                "created_by_id": session.get("user",""),
-                "created_at": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p"),
-                "date": datetime.now(PH_TZ).strftime("%Y-%m-%d")
-            })
-            try:
-                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": session.get("role"),"type": f"ADD_ANNOUNCEMENT {title}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": "ALL"})
-            except:
-                pass
-    except Exception as e:
-        print(f"add_announcement error: {e}")
-        traceback.print_exc()
-    return redirect("/announcements")
-
-@app.route("/delete_announcement/<ann_id>")
-@login_required
-def delete_announcement(ann_id):
-    if session.get("role")=="agent":
-        return redirect("/announcements")
-    try:
-        if db_root:
-            db_root.child(f"announcements/{ann_id}").delete()
-            # Also delete reads
-            reads=get_announcement_reads()
-            for r in reads:
-                if str(r.get("announcement_id"))==str(ann_id):
-                    db_root.child(f"announcement_reads/{r.get('id')}").delete()
-    except:
-        pass
-    return redirect("/announcements")
-
-@app.route("/confirm_announcement/<ann_id>")
-@login_required
-def confirm_announcement(ann_id):
-    try:
-        agent_id=session.get("agent_id") or session.get("user")
-        agent_name=session.get("name") or session.get("user")
-        if not agent_id:
-            return redirect("/announcements")
-        # Check if already read
-        if has_read(ann_id, agent_id):
-            return redirect("/announcements")
-        if db_root:
-            import uuid
-            read_id=str(uuid.uuid4())[:8]
-            db_root.child(f"announcement_reads/{read_id}").set({
-                "id": read_id,
-                "announcement_id": ann_id,
-                "agent_id": agent_id,
-                "agent_name": agent_name,
-                "read_at": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M %p"),
-                "date": datetime.now(PH_TZ).strftime("%Y-%m-%d")
-            })
-            try:
-                db_root.child("login_logs").push({"user": session.get("user"),"name": session.get("name"),"role": session.get("role"),"type": f"CONFIRM_ANNOUNCEMENT {ann_id}","timestamp": datetime.now(PH_TZ).strftime("%Y-%m-%d %I:%M:%S %p"),"date": datetime.now(PH_TZ).strftime("%Y-%m-%d"),"agent_id": agent_id})
-            except:
-                pass
-    except Exception as e:
-        print(f"confirm_announcement error: {e}")
-    return redirect("/announcements")
-
-
 @app.route("/export")
 @login_required
 def export_page():
@@ -1529,6 +1481,9 @@ def export_excel():
         return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Export Error</h6><pre style='color:#fbbf24;font-size:10px'>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
 
 
+if __name__=="__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+
 @app.route("/export/pdf")
 @login_required
 def export_pdf():
@@ -1538,7 +1493,6 @@ def export_pdf():
         perf_logs=get_all_perf()
         anns=get_all_announcements()
         reads=get_announcement_reads()
-        # Calculate TL KPI
         agent_stats=[]
         team_n=0; team_r=0; team_loss=0; team_tot=0
         for a in agents:
@@ -1547,100 +1501,51 @@ def export_pdf():
             team_n+=n; team_r+=r; team_loss+=loss; team_tot+=tot
             plogs=get_perf(a.get("id"))
             la,lq,lc,lf,aa,qa,ac,af=calc_perf(plogs)
-            wh_target=float(a.get("WORKING_HOURS_TARGET", a.get("WORKING HOURS TARGET", 220)))
+            wh_target=float(a.get("WORKING_HOURS_TARGET", 220))
             wh_actual=wh_target-loss
             wh_comp=(wh_actual/wh_target*100) if wh_target>0 else 0
             agent_stats.append({"name":a.get("NAME",""),"tid":a.get("TENCENT ID") or a.get("TENCENT_ID",""),"tot":tot,"loss":loss,"net":net,"aht":la,"qa":lq,"csat":lc,"fcr":lf,"wh_target":wh_target,"wh_actual":wh_actual,"wh_comp":wh_comp})
         team_qa=[a["qa"] for a in agent_stats if a["qa"]>0]
         team_aht=[a["aht"] for a in agent_stats if a["aht"]>0]
-        team_csat=[a["csat"] for a in agent_stats if a["csat"]>0]
-        team_fcr=[a["fcr"] for a in agent_stats if a["fcr"]>0]
         total_wh=sum([a["wh_target"] for a in agent_stats])
         total_actual=total_wh-team_loss
         overall_att=(total_actual/total_wh*100) if total_wh>0 else 0
         avg_qa=round(sum(team_qa)/len(team_qa),1) if team_qa else 0
         avg_aht=round(sum(team_aht)/len(team_aht),1) if team_aht else 0
-        avg_csat=round(sum(team_csat)/len(team_csat),1) if team_csat else 0
-        avg_fcr=round(sum(team_fcr)/len(team_fcr),1) if team_fcr else 0
-        
-        # Try to generate PDF with reportlab
         try:
-            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.lib.pagesizes import A4
             from reportlab.lib.units import inch
-            from reportlab.lib.colors import HexColor, white, black
+            from reportlab.lib.colors import HexColor
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
             from reportlab.lib import colors
-            from reportlab.graphics.shapes import Drawing
-            from reportlab.graphics.charts.barcharts import VerticalBarChart
-            from reportlab.graphics.charts.linecharts import HorizontalLineChart
             from io import BytesIO
             import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
-            
             buffer=BytesIO()
             doc=SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
             styles=getSampleStyleSheet()
-            title_style=ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, spaceAfter=12, textColor=HexColor('#fbbf24'), alignment=1)
-            heading_style=ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=14, spaceAfter=6, textColor=HexColor('#0f172a'))
+            title_style=ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=12, textColor=HexColor('#fbbf24'), alignment=1)
+            heading_style=ParagraphStyle('CustomHeading', parent=styles['Heading2'], fontSize=12, spaceAfter=6)
             normal_style=styles['Normal']
             normal_style.fontSize=9
-            
             story=[]
-            story.append(Paragraph("TEAM SHINE M9 - Executive Report - TL KPI QA AHT ATTENDANCE", title_style))
-            story.append(Paragraph(f"Generated: {datetime.now(PH_TZ).strftime('%Y-%m-%d %I:%M %p')} | Team Leader: {session.get('name','TL')} | Total Agents: {len(agents)}", normal_style))
+            story.append(Paragraph("TEAM SHINE M9 - Executive Report", title_style))
+            story.append(Paragraph(f"Generated: {datetime.now(PH_TZ).strftime('%Y-%m-%d %I:%M %p')} | Agents: {len(agents)}", normal_style))
             story.append(Spacer(1, 12))
-            
-            # Executive Summary
-            story.append(Paragraph("📊 Executive Summary - Basa sa Data", heading_style))
-            summary_text=f"""
-            <b>Team Overview:</b> Total {len(agents)} agents. Total OT: {round(team_tot,1)}h (Normal: {round(team_n,1)}h, Restday: {round(team_r,1)}h). Total Loss: {round(team_loss,1)}h. Net: {round(team_tot-team_loss,1)}h.<br/>
-            <b>Performance KPI:</b> Team Avg QA: {avg_qa}% ({len(team_qa)} agents), Team Avg AHT: {avg_aht}m ({len(team_aht)} agents), Team Avg CSAT: {avg_csat}%, Team Avg FCR: {avg_fcr}%.<br/>
-            <b>Attendance:</b> Overall Attendance: {round(overall_att,1)}% - Total WH Target: {round(total_wh,1)}h, Actual: {round(total_actual,1)}h, Loss: {round(team_loss,1)}h.<br/>
-            <b>Announcements:</b> Total {len(anns)} announcements posted, {len(reads)} confirmations - {len(agents)} agents, {round(len(reads)/len(anns)/len(agents)*100,1) if anns and agents else 0}% read rate.<br/>
-            <b>Risk:</b> {len([a for a in agent_stats if a['loss']>=4])} agents with Loss >=4h (Critical), {len([a for a in agent_stats if a['qa']>0 and a['qa']<75])} agents with QA <75% (Needs Improvement).
-            """
+            story.append(Paragraph("Executive Summary", heading_style))
+            summary_text=f"Total {len(agents)} agents. Total OT: {round(team_tot,1)}h. Loss: {round(team_loss,1)}h. Avg QA: {avg_qa}%. Avg AHT: {avg_aht}m. Attendance: {round(overall_att,1)}%. Announcements: {len(anns)} posted, {len(reads)} confirmations."
             story.append(Paragraph(summary_text, normal_style))
             story.append(Spacer(1, 12))
-            
-            # TL KPI Table
-            story.append(Paragraph("📊 TL Overall Team KPI - QA, AHT, ATTENDANCE", heading_style))
-            kpi_data=[
-                ["Metric", "Value", "Unit", "Details"],
-                ["Team Avg QA", str(avg_qa), "%", f"{len(team_qa)} agents with QA"],
-                ["Team Avg AHT", str(avg_aht), "minutes", f"{len(team_aht)} agents"],
-                ["Team Avg CSAT", str(avg_csat), "%", f"{len(team_csat)} agents"],
-                ["Team Avg FCR", str(avg_fcr), "%", f"{len(team_fcr)} agents"],
-                ["Team Attendance", str(round(overall_att,1)), "%", f"{round(total_actual,1)}/{round(total_wh,1)}h"],
-                ["Total Normal OT", str(round(team_n,1)), "h", ""],
-                ["Total Restday OT", str(round(team_r,1)), "h", ""],
-                ["Total OT", str(round(team_tot,1)), "h", ""],
-                ["Total Loss", str(round(team_loss,1)), "h", ""],
-                ["Team Net", str(round(team_tot-team_loss,1)), "h", ""],
-            ]
-            t=Table(kpi_data, colWidths=[120, 60, 60, 150])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), HexColor('#fbbf24')),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,-1), 8),
-                ('BOTTOMPADDING', (0,0), (-1,0), 12),
-                ('BACKGROUND', (0,1), (-1,-1), colors.beige),
-                ('GRID', (0,0), (-1,-1), 1, colors.black)
-            ]))
+            story.append(Paragraph("TL Team KPI", heading_style))
+            kpi_data=[["Metric","Value","Details"],["Team Avg QA",str(avg_qa)+"%",f"{len(team_qa)} agents"],["Team Avg AHT",str(avg_aht)+"m",f"{len(team_aht)} agents"],["Attendance",str(round(overall_att,1))+"%",f"{round(total_actual,1)}/{round(total_wh,1)}h"],["Total OT",str(round(team_tot,1))+"h",""],["Total Loss",str(round(team_loss,1))+"h",""]]
+            t=Table(kpi_data, colWidths=[120, 80, 150])
+            t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),HexColor('#fbbf24')),('GRID',(0,0),(-1,-1),1,colors.black),('FONTSIZE',(0,0),(-1,-1),8)]))
             story.append(t)
             story.append(Spacer(1, 12))
-            
-            # Graphs - create matplotlib charts and add to PDF
             try:
-                # OT Graph
-                fig, axes=plt.subplots(2, 2, figsize=(8, 6))
-                fig.suptitle('Team OT & Performance Trends')
-                # Get monthly data
                 from collections import defaultdict
-                import calendar
                 m_groups=defaultdict(list)
                 for l in ot_logs:
                     dt=parse_date(l.get("date",""))
@@ -1651,91 +1556,42 @@ def export_pdf():
                 for m in months:
                     n,r,tot,loss,net=calc(m_groups.get(m,[]))
                     normal_m.append(n); restday_m.append(r); total_m.append(tot); loss_m.append(loss)
+                fig, axes=plt.subplots(2,2, figsize=(8,6))
                 axes[0,0].plot(months, normal_m, color='#22c55e', marker='o')
-                axes[0,0].set_title('Normal OT Monthly')
+                axes[0,0].set_title('Normal OT')
                 axes[0,1].plot(months, restday_m, color='#3b82f6', marker='o')
-                axes[0,1].set_title('Restday OT Monthly')
+                axes[0,1].set_title('Restday OT')
                 axes[1,0].plot(months, total_m, color='#fbbf24', marker='o')
-                axes[1,0].set_title('Total OT Monthly')
+                axes[1,0].set_title('Total OT')
                 axes[1,1].plot(months, loss_m, color='#ef4444', marker='o')
-                axes[1,1].set_title('Loss Hrs Monthly')
+                axes[1,1].set_title('Loss')
                 plt.tight_layout()
                 img_buffer=BytesIO()
-                plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+                plt.savefig(img_buffer, format='png', dpi=150)
                 plt.close()
                 img_buffer.seek(0)
                 story.append(Image(img_buffer, width=450, height=300))
                 story.append(Spacer(1, 12))
-                
-                # QA AHT Attendance Graph
-                fig2, axes2=plt.subplots(1, 3, figsize=(8, 3))
-                # QA trend
-                p_groups=defaultdict(list)
-                for l in perf_logs:
-                    dt=parse_date(l.get("date",""))
-                    if dt:
-                        p_groups[dt.month].append(l)
-                qa_m=[]; aht_m=[]; csat_m=[]
-                for m in months:
-                    la,lq,lc,lf,aa,qa,ac,af=calc_perf(p_groups.get(m,[]))
-                    qa_m.append(qa); aht_m.append(aa); csat_m.append(ac)
-                axes2[0].plot(months, qa_m, color='#8b5cf6', marker='o')
-                axes2[0].set_title('QA Trend')
-                axes2[1].plot(months, aht_m, color='#f97316', marker='o')
-                axes2[1].set_title('AHT Trend')
-                axes2[2].plot(months, csat_m, color='#06b6d4', marker='o')
-                axes2[2].set_title('CSAT Trend')
-                plt.tight_layout()
-                img_buffer2=BytesIO()
-                plt.savefig(img_buffer2, format='png', dpi=150, bbox_inches='tight')
-                plt.close()
-                img_buffer2.seek(0)
-                story.append(Image(img_buffer2, width=450, height=150))
-                story.append(Spacer(1, 12))
             except Exception as e:
-                story.append(Paragraph(f"Graph generation error: {str(e)} - Data: OT {len(ot_logs)} logs, Perf {len(perf_logs)} logs", normal_style))
-            
-            # Agent Detail Table
+                story.append(Paragraph(f"Graph error: {str(e)}", normal_style))
             story.append(PageBreak())
-            story.append(Paragraph("👥 Agent Detail - QA, AHT, ATTENDANCE KPI per Agent", heading_style))
-            agent_data=[["ID","NAME","TENCENT_ID","TOTAL_OT","LOSS","NET","AHT","QA","WH_COMP%"]]
-            for a in agent_stats[:20]:  # First 20 for PDF
-                agent_data.append([str(a.get("name",""))[:15], str(a.get("tid","")), str(a.get("tot","")), str(a.get("loss","")), str(a.get("net","")), str(a.get("aht","")), str(a.get("qa","")), str(round(a.get("wh_comp",0),1))+"%"])
-            t2=Table(agent_data, colWidths=[60, 60, 50, 50, 40, 40, 40, 40, 50])
-            t2.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), HexColor('#151e32')),
-                ('TEXTCOLOR', (0,0), (-1,0), HexColor('#fbbf24')),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0,0), (-1,-1), 7),
-                ('GRID', (0,0), (-1,-1), 1, colors.black)
-            ]))
+            story.append(Paragraph("Agent Detail", heading_style))
+            agent_data=[["NAME","TENCENT_ID","OT","LOSS","QA","AHT","WH_COMP"]]
+            for a in agent_stats[:20]:
+                agent_data.append([a["name"][:12], a["tid"], str(a["tot"]), str(a["loss"]), str(a["qa"]), str(a["aht"]), str(round(a["wh_comp"],1))+"%"])
+            t2=Table(agent_data, colWidths=[70, 50, 40, 40, 40, 40, 50])
+            t2.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),HexColor('#151e32')),('TEXTCOLOR',(0,0),(-1,0),HexColor('#fbbf24')),('GRID',(0,0),(-1,-1),1,colors.black),('FONTSIZE',(0,0),(-1,-1),7)]))
             story.append(t2)
-            story.append(Spacer(1, 12))
-            
-            # Announcements Summary
-            story.append(Paragraph("📢 Announcements Summary", heading_style))
-            if anns:
-                for ann in anns[:5]:
-                    reads_for_ann=get_reads_for_announcement(ann.get("id"))
-                    story.append(Paragraph(f"<b>{ann.get('title','')} - {ann.get('created_at','')}</b> - {len(reads_for_ann)}/{len(agents)} confirmed reads<br/>{ann.get('message','')[:200]}", normal_style))
-                    story.append(Spacer(1, 6))
-            else:
-                story.append(Paragraph("No announcements", normal_style))
-            
             doc.build(story)
             pdf=buffer.getvalue()
             buffer.close()
-            return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition":"attachment;filename=Team_Shine_M9_Executive_Report_QA_AHT_ATTENDANCE.pdf"})
+            return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition":"attachment;filename=Team_Shine_M9_Executive_Report.pdf"})
         except ImportError as e:
-            # Fallback if reportlab not available
-            return page(f"<div class='card-dark'><h6 style='color:#ef4444'>PDF Export - Need reportlab & matplotlib</h6><p style='color:var(--text2);font-size:12px'>Error: {str(e)}</p><p style='color:var(--text2)'>Install: pip install reportlab matplotlib</p><pre style='color:#fbbf24;font-size:10px'>pip install reportlab matplotlib openpyxl</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+            return page(f"<div class='card-dark'><h6 style='color:#ef4444'>Need reportlab matplotlib</h6><p>Error: {str(e)}</p><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
     except Exception as e:
-        print(f"export_pdf error: {e}")
         traceback.print_exc()
-        return page(f"<div class='card-dark'><h6 style='color:#ef4444'>PDF Export Error</h6><pre style='color:#fbbf24;font-size:10px'>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
+        return page(f"<div class='card-dark'><h6>PDF Error</h6><pre>{traceback.format_exc()}</pre><a href='/export' class='btn btn-sm btn-outline-light'>Back</a></div>")
 
 
 
-if __name__=="__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+
