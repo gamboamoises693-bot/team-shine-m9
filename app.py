@@ -259,7 +259,7 @@ def get_filtered_stats(period, year, month, quarter, week):
             ahtd.append(round(aa,1)); qad.append(round(qa,1))
     return labels, nd, rd, td, ld, netd, ahtd, qad
 
-BASE_HEAD = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+BASE_CSS = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -276,26 +276,8 @@ body{background:var(--bg);color:var(--text);font-family:Inter,system-ui}
 input,select{background:var(--card2)!important;color:var(--text)!important;border:1px solid var(--border)!important}
 .navbar{background:var(--card2)!important;border-bottom:1px solid var(--border2)!important}
 </style></head><body>
-NAVBAR_PLACEHOLDER
-<div class="container-fluid p-3" style="max-width:1200px;margin:auto">
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-function toggleTheme(){
-  const html=document.documentElement;
-  const current=html.getAttribute('data-theme')||'dark';
-  const next=current==='dark'?'light':'dark';
-  html.setAttribute('data-theme',next);
-  localStorage.setItem('theme',next);
-  const btn=document.getElementById('themeToggle');
-  if(btn) btn.textContent=next==='dark'?'🌓':'☀️';
-}
-(function(){
-  const saved=localStorage.getItem('theme')||'dark';
-  document.documentElement.setAttribute('data-theme',saved);
-})();
-</script>
 """
-BASE_FOOT = "</div><footer style='text-align:center;padding:24px;color:#64748b;font-size:12px;border-top:1px solid #1e293b;margin-top:30px'><div>Developed By : <span style='color:#fbbf24;font-weight:700'>Moises Gamboa</span> | Computer Engineer</div></footer></body></html>"
+BASE_FOOT = "</div><footer style='text-align:center;padding:24px;color:#64748b;font-size:12px;border-top:1px solid #1e293b;margin-top:30px'><div>Developed By : <span style='color:#fbbf24;font-weight:700'>Moises Gamboa</span> | Computer Engineer</div></footer><script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script><script>function toggleTheme(){const html=document.documentElement;const current=html.getAttribute('data-theme')||'dark';const next=current==='dark'?'light':'dark';html.setAttribute('data-theme',next);localStorage.setItem('theme',next);const btn=document.getElementById('themeToggle');if(btn)btn.textContent=next==='dark'?'🌓':'☀️';}(function(){const saved=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',saved);})();</script></body></html>"
 
 def get_navbar():
     role=session.get("role","")
@@ -322,6 +304,7 @@ def get_navbar():
 </div>
 </div>
 </div></nav>
+<div class="container-fluid p-3" style="max-width:1200px;margin:auto">
 """
     else:
         return """
@@ -351,16 +334,14 @@ def get_navbar():
 </div>
 </div>
 </div></nav>
+<div class="container-fluid p-3" style="max-width:1200px;margin:auto">
 """
 
 def page(c):
-    navbar=get_navbar()
-    head=BASE_HEAD.replace("NAVBAR_PLACEHOLDER", navbar)
-    return head + c + BASE_FOOT
+    return BASE_CSS + get_navbar() + c + BASE_FOOT
 
 
-def page(c):
-    return BASE_HEAD + c + BASE_FOOT
+@app.route("/health")
 
 @app.route("/health")
 def health():
@@ -954,9 +935,6 @@ def view(aid):
     if not perf_rows:
         perf_rows="<tr><td colspan=5 style='text-align:center;color:#64748b'>No logs</td></tr>"
     initial=str(data.get("NAME","?"))[:1]
-    avatar_url=data.get("AVATAR") or data.get("AVATAR_URL") or ""
-    avatar_html=f"<div style='width:90px;height:90px;border-radius:18px;overflow:hidden;margin:auto;border:2px solid #fbbf24'><img src='{avatar_url}' style='width:100%;height:100%;object-fit:cover'></div>" if avatar_url else f"<div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div>"
-    delete_link=f'<a href="/delete_avatar/{aid}" class="btn btn-sm btn-outline-danger">Remove</a>' if avatar_url else ""
     target=float(data.get("TARGET_OT",20))
     wh_target=float(data.get("WORKING_HOURS_TARGET",220))
     pct=(tot/target*100) if target>0 else 0
@@ -971,23 +949,7 @@ def view(aid):
     if la>10: risk_score+=20
     risk="Critical" if risk_score>=60 else "High" if risk_score>=40 else "Moderate" if risk_score>=20 else "Low"
     risk_color="#22c55e" if risk=="Low" else "#fbbf24" if risk=="Moderate" else "#f97316" if risk=="High" else "#ef4444"
-    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'>{avatar_html}<h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small><div class='mt-2'><form method='POST' action='/upload_avatar/{aid}' enctype='multipart/form-data' class='d-flex gap-2 justify-content-center'><input type='file' name='avatar' accept='image/*' class='form-control form-control-sm' style='width:180px' required><button class='btn btn-sm btn-warning'>📸 Upload</button>{delete_link}</form></div><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"
-
-    anns=get_all_announcements()
-    agent_reads=[]
-    for ann in anns:
-        if not has_read(ann.get("id"), aid):
-            agent_reads.append(ann)
-    ann_html_agent=""
-    for ann in anns[:3]:
-        read=has_read(ann.get("id"), aid)
-        status_btn="<span class='badge bg-success'>✅ Nabasa</span>" if read else f"<a href='/confirm_announcement/{ann.get('id')}' class='btn btn-sm btn-success'>✅ Confirm</a>"
-        ann_html_agent+=f"<div class='card-dark mt-2' style='border:1px solid #fbbf24'><b style='font-size:12px'>{ann.get('title','')}</b><p style='font-size:12px;margin:4px 0'>{ann.get('message','')}</p><div class='d-flex justify-content-between'><small>By: {ann.get('created_by','TL')}</small>{status_btn}</div></div>"
-    if agent_reads:
-        html+=f"<div class='card-dark mt-3' style='border:2px solid #ef4444'><h6 style='color:#ef4444'>📢 New Announcements ({len(agent_reads)} unread)</h6>{ann_html_agent}<a href='/announcements' class='btn btn-sm btn-warning w-100 mt-2'>View All + Confirm</a></div>"
-    else:
-        html+=f"<div class='card-dark mt-3' style='border:1px solid #8b5cf6'><h6 style='color:#8b5cf6'>📢 Announcements</h6>{ann_html_agent if ann_html_agent else '<small>No announcements</small>'}<a href='/announcements' class='btn btn-sm btn-outline-light w-100 mt-2'>View All</a></div>"
-
+    html=f"<a href='/' class='btn btn-sm btn-outline-light mb-3'>Back</a><div class='card-dark'><div class='text-center'><div style='width:90px;height:90px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#111827;margin:auto'>{initial}</div><h4 style='color:white;margin-top:12px'>{data.get('NAME','')}</h4><small style='color:#94a3b8'>{data.get('TENCENT_ID','')} | WH: {wh_target}h | OT: {target}h</small><div class='mt-2'><small style='color:#94a3b8'>OT {round(pct,1)}% | WH {round(wh_comp,1)}% | Risk <span style='color:{risk_color}'>{risk}</span></small><div class='d-flex justify-content-center gap-2 mt-1'><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,pct)}%;background:{bar_color}'></div></div><div class='progress' style='height:8px;width:100px;background:#0f172a'><div class='progress-bar' style='width:{min(100,wh_comp)}%;background:{wh_bar_color}'></div></div></div></div></div>"
     html+=f"<div class='row g-2 mt-3'><div class='col-4'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>NORMAL</div><div class='val-big' style='color:#22c55e'>{n}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #3b82f6'><div class='label'>RESTDAY</div><div class='val-big' style='color:#3b82f6'>{r}h</div></div></div><div class='col-4'><div class='kpi' style='border:1px solid #ef4444'><div class='label'>LOSS</div><div class='val-big' style='color:#ef4444'>{loss}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #22c55e'><div class='label'>TOTAL OT</div><div class='val-big' style='color:#22c55e'>{tot}h</div></div></div><div class='col-6'><div class='kpi' style='border:1px solid #fbbf24'><div class='label'>NET</div><div class='val-big' style='color:#fbbf24'>+{net}h</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f97316;min-height:80px;height:80px'><div class='label'>AHT</div><div class='val-big' style='font-size:16px;color:#f97316'>{la}m</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #8b5cf6;min-height:80px;height:80px'><div class='label'>QA</div><div class='val-big' style='font-size:16px;color:#8b5cf6'>{lq}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #06b6d4;min-height:80px;height:80px'><div class='label'>CSAT</div><div class='val-big' style='font-size:16px;color:#06b6d4'>{lc}%</div></div></div><div class='col-3'><div class='kpi' style='border:1px solid #f59e0b;min-height:80px;height:80px'><div class='label'>FCR</div><div class='val-big' style='font-size:16px;color:#f59e0b'>{lf}%</div></div></div></div>"
 
     # ViewCard AHT QA - Enhanced
