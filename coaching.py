@@ -55,6 +55,21 @@ def get_coaching_reads():
         return []
 
 
+def get_all_coaching():
+    """All coaching sessions across every agent (used by reports)."""
+    try:
+        raw = db_root.child("coaching_logs").get() if db_root else None
+        res = []
+        if isinstance(raw, dict):
+            for cid, v in raw.items():
+                if isinstance(v, dict):
+                    v["id"] = cid
+                    res.append(v)
+        return res
+    except Exception:
+        return []
+
+
 def get_read_for(coaching_id):
     """Returns the read-receipt record for a coaching entry, or None."""
     for r in get_coaching_reads():
