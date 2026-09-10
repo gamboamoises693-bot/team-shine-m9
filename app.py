@@ -1547,7 +1547,7 @@ except Exception as e:
 # way on Render), since gunicorn imports the app object without triggering
 # this block at all.
 if __name__=="__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)), threaded=True)
 
 
 
