@@ -1,3 +1,4 @@
+
 # docx_export.py
 # Adds a brand-new /export/word route producing an executive Word report.
 # This does not touch any existing route in app.py — it's a new endpoint,
